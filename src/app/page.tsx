@@ -14,7 +14,7 @@ import {
   Identity,
 } from "@coinbase/onchainkit/identity";
 import { useSupabaseWeb3Auth } from "@/lib/auth/useSupabaseWeb3Auth";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 
 interface Profile {
@@ -51,15 +51,20 @@ interface PaymentRequest {
 }
 
 export default function Home() {
+  const [mounted, setMounted] = useState(false);
   const { address, isConnected } = useAccount();
-  const { status, user, signIn, signOut, isAuthenticated, error } =
-    useSupabaseWeb3Auth();
+  const { status, user, signIn, signOut, isAuthenticated, error } = useSupabaseWeb3Auth();
+  
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactsError, setContactsError] = useState<string | null>(null);
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
   const [paymentRequestsError, setPaymentRequestsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loadProfile = async () => {
     if (!user) return;
@@ -112,6 +117,22 @@ export default function Home() {
       setPaymentRequests(data || []);
     }
   };
+
+  if (!mounted) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-black">
+        <div className="bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-white mb-2">BaseSplit</h1>
+            <p className="text-gray-400">Split expenses on Base</p>
+          </div>
+          <div className="flex justify-center">
+            <div className="animate-pulse text-gray-400">Loading...</div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-black">
@@ -176,9 +197,7 @@ export default function Home() {
                 disabled={!isConnected || status === "signing_in"}
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
               >
-                {status === "signing_in"
-                  ? "Signing in..."
-                  : "Sign in to Supabase"}
+                {status === "signing_in" ? "Signing in..." : "Sign in to Supabase"}
               </button>
             )}
 

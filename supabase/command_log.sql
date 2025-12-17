@@ -212,3 +212,8 @@ create trigger trg_payment_requests_set_updated_at
 before update on public.payment_requests
 for each row execute function public.set_updated_at();
 
+-- [2025-12-17] REQUIRED: Enable Anonymous Sign-In in Supabase Dashboard
+-- Go to: https://supabase.com/dashboard/project/kxlfigufncqfcvzhgvof/auth/providers
+-- Scroll to "Anonymous Sign-In" and toggle it ON
+-- This is required for the Web3 wallet authentication flow
+

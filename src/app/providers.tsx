@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
+import { CDPReactProvider } from "@coinbase/cdp-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { base } from "wagmi/chains";
@@ -30,12 +31,22 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <OnchainKitProvider
-          chain={base}
-          apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+        <CDPReactProvider
+          config={{
+            projectId: process.env.NEXT_PUBLIC_CDP_PROJECT_ID || "",
+            ethereum: {
+              createOnLogin: "smart",
+            },
+            appName: "BaseSplit",
+          }}
         >
-          {children}
-        </OnchainKitProvider>
+          <OnchainKitProvider
+            chain={base}
+            apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+          >
+            {children}
+          </OnchainKitProvider>
+        </CDPReactProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );
