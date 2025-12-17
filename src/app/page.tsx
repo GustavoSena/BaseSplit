@@ -89,7 +89,7 @@ export default function Home() {
   
   const currentWalletAddress = address || cdpAuth.walletAddress;
   
-  // USDC Balance with periodic refresh
+  // USDC Balance for current wallet with periodic refresh
   const { data: usdcBalance, refetch: refetchBalance } = useReadContract({
     address: USDC_BASE_MAINNET as `0x${string}`,
     abi: ERC20_ABI,
@@ -97,12 +97,44 @@ export default function Home() {
     args: currentWalletAddress ? [currentWalletAddress as `0x${string}`] : undefined,
     query: { 
       enabled: !!currentWalletAddress,
-      refetchInterval: 10000, // Refresh every 10 seconds
+      refetchInterval: 10000,
+    },
+  });
+  
+  // USDC Balance for smart account
+  const { data: smartAccountBalance } = useReadContract({
+    address: USDC_BASE_MAINNET as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: cdpAuth.smartAccountAddress ? [cdpAuth.smartAccountAddress as `0x${string}`] : undefined,
+    query: { 
+      enabled: !!cdpAuth.smartAccountAddress,
+      refetchInterval: 10000,
+    },
+  });
+  
+  // USDC Balance for EOA
+  const { data: eoaBalance } = useReadContract({
+    address: USDC_BASE_MAINNET as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: cdpAuth.eoaAddress ? [cdpAuth.eoaAddress as `0x${string}`] : undefined,
+    query: { 
+      enabled: !!cdpAuth.eoaAddress,
+      refetchInterval: 10000,
     },
   });
   
   const formattedBalance = usdcBalance 
     ? (Number(usdcBalance) / 1e6).toFixed(2) 
+    : "0.00";
+  
+  const formattedSmartBalance = smartAccountBalance 
+    ? (Number(smartAccountBalance) / 1e6).toFixed(2) 
+    : "0.00";
+  
+  const formattedEoaBalance = eoaBalance 
+    ? (Number(eoaBalance) / 1e6).toFixed(2) 
     : "0.00";
   
   const isAuthenticated = walletAuth.isAuthenticated || cdpAuth.isAuthenticated;
@@ -138,7 +170,7 @@ export default function Home() {
   const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
   
   // Tab state
-  const [activeTab, setActiveTab] = useState<"requests" | "contacts">("requests");
+  const [activeTab, setActiveTab] = useState<"requests" | "contacts" | "settings">("requests");
   
   // Paymaster capabilities
   const { data: availableCapabilities } = useCapabilities({
@@ -518,7 +550,7 @@ export default function Home() {
                     setActiveTab("requests");
                     loadPaymentRequests();
                   }}
-                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
                     activeTab === "requests"
                       ? "bg-gray-700 text-white"
                       : "text-gray-400 hover:text-white"
@@ -531,13 +563,23 @@ export default function Home() {
                     setActiveTab("contacts");
                     loadContacts();
                   }}
-                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
                     activeTab === "contacts"
                       ? "bg-gray-700 text-white"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
                   Contacts
+                </button>
+                <button
+                  onClick={() => setActiveTab("settings")}
+                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === "settings"
+                      ? "bg-gray-700 text-white"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Settings
                 </button>
               </div>
 
@@ -609,6 +651,83 @@ export default function Home() {
                     <p className="text-gray-500 text-sm text-center">No contacts yet</p>
                   )}
                 </>
+              )}
+
+              {/* Settings Tab */}
+              {activeTab === "settings" && (
+                <div className="space-y-4">
+                  <h3 className="text-white font-medium">Wallet Settings</h3>
+                  
+                  {isCDPSignedIn && cdpAuth.smartAccountAddress && cdpAuth.eoaAddress ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-400">Select which wallet to use:</p>
+                      
+                      {/* Smart Account Option */}
+                      <button
+                        onClick={() => cdpAuth.switchWalletType("smart")}
+                        className={`w-full p-4 rounded-lg border-2 transition-colors text-left ${
+                          cdpAuth.selectedWalletType === "smart"
+                            ? "border-blue-500 bg-blue-900/20"
+                            : "border-gray-700 bg-gray-900 hover:border-gray-600"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-white font-medium">Smart Account</p>
+                            <p className="text-gray-500 font-mono text-xs">
+                              {cdpAuth.smartAccountAddress.slice(0, 10)}...{cdpAuth.smartAccountAddress.slice(-8)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-white font-bold">${formattedSmartBalance}</p>
+                            <p className="text-gray-500 text-xs">USDC</p>
+                          </div>
+                        </div>
+                        {cdpAuth.selectedWalletType === "smart" && (
+                          <span className="inline-block mt-2 text-xs text-blue-400">✓ Active</span>
+                        )}
+                      </button>
+                      
+                      {/* EOA Option */}
+                      <button
+                        onClick={() => cdpAuth.switchWalletType("eoa")}
+                        className={`w-full p-4 rounded-lg border-2 transition-colors text-left ${
+                          cdpAuth.selectedWalletType === "eoa"
+                            ? "border-blue-500 bg-blue-900/20"
+                            : "border-gray-700 bg-gray-900 hover:border-gray-600"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-white font-medium">EOA Wallet</p>
+                            <p className="text-gray-500 font-mono text-xs">
+                              {cdpAuth.eoaAddress.slice(0, 10)}...{cdpAuth.eoaAddress.slice(-8)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-white font-bold">${formattedEoaBalance}</p>
+                            <p className="text-gray-500 text-xs">USDC</p>
+                          </div>
+                        </div>
+                        {cdpAuth.selectedWalletType === "eoa" && (
+                          <span className="inline-block mt-2 text-xs text-blue-400">✓ Active</span>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm">
+                      {isCDPSignedIn 
+                        ? "Only one wallet type available" 
+                        : "Sign in with social login to manage wallet settings"}
+                    </p>
+                  )}
+                  
+                  <div className="border-t border-gray-700 pt-4">
+                    <p className="text-sm text-gray-400 mb-2">App Info</p>
+                    <p className="text-xs text-gray-500">Version 1.0.0</p>
+                    <p className="text-xs text-gray-500">Network: Base Mainnet</p>
+                  </div>
+                </div>
               )}
 
               {/* Requests Tab */}

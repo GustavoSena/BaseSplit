@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 
 type AuthStatus = "signed_out" | "signing_in" | "signed_in";
+type WalletType = "smart" | "eoa";
 
 export function useCDPAuth() {
   const { isSignedIn: isCDPSignedIn } = useIsSignedIn();
@@ -17,6 +18,14 @@ export function useCDPAuth() {
   const [status, setStatus] = useState<AuthStatus>("signed_out");
   const [error, setError] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(null);
+  const [eoaAddress, setEoaAddress] = useState<string | null>(null);
+  const [selectedWalletType, setSelectedWalletType] = useState<WalletType>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("preferredWalletType") as WalletType) || "smart";
+    }
+    return "smart";
+  });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -68,16 +77,39 @@ export function useCDPAuth() {
     []
   );
 
+  // Update wallet addresses when currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      const smart = currentUser.evmSmartAccounts?.[0] || null;
+      const eoa = currentUser.evmAccounts?.[0] || null;
+      setSmartAccountAddress(smart);
+      setEoaAddress(eoa);
+      
+      // Set active wallet based on preference
+      const activeWallet = selectedWalletType === "smart" ? (smart || eoa) : (eoa || smart);
+      setWalletAddress(activeWallet);
+    }
+  }, [currentUser, selectedWalletType]);
+
+  // Function to switch wallet type
+  const switchWalletType = useCallback((type: WalletType) => {
+    setSelectedWalletType(type);
+    localStorage.setItem("preferredWalletType", type);
+    
+    const newWallet = type === "smart" 
+      ? (smartAccountAddress || eoaAddress) 
+      : (eoaAddress || smartAccountAddress);
+    setWalletAddress(newWallet);
+  }, [smartAccountAddress, eoaAddress]);
+
   useEffect(() => {
     const syncWithSupabase = async () => {
       if (isCDPSignedIn && currentUser) {
-        // Prefer smart account, fallback to EOA
-        const smartAccount = currentUser.evmSmartAccounts?.[0];
-        const eoaAccount = currentUser.evmAccounts?.[0];
-        const accountAddress = smartAccount || eoaAccount;
+        const smart = currentUser.evmSmartAccounts?.[0];
+        const eoa = currentUser.evmAccounts?.[0];
+        const accountAddress = selectedWalletType === "smart" ? (smart || eoa) : (eoa || smart);
         
         if (accountAddress) {
-          setWalletAddress(accountAddress);
           setStatus("signing_in");
           setError(null);
 
@@ -107,7 +139,7 @@ export function useCDPAuth() {
     };
 
     syncWithSupabase();
-  }, [isCDPSignedIn, currentUser, upsertProfile]);
+  }, [isCDPSignedIn, currentUser, upsertProfile, selectedWalletType]);
 
   const signOut = useCallback(async () => {
     try {
@@ -130,6 +162,10 @@ export function useCDPAuth() {
     error,
     signOut,
     walletAddress,
+    smartAccountAddress,
+    eoaAddress,
+    selectedWalletType,
+    switchWalletType,
     isCDPSignedIn,
     isAuthenticated: status === "signed_in" && isCDPSignedIn,
   };

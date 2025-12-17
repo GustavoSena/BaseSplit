@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <g fill="white">
+    <!-- Dollar sign / Split symbol -->
+    <path d="M256 80c-8.8 0-16 7.2-16 16v24c-44.2 4-80 41.1-80 86 0 47.5 38.5 86 86 86h20c29.8 0 54 24.2 54 54s-24.2 54-54 54h-20c-29.8 0-54-24.2-54-54 0-8.8-7.2-16-16-16s-16 7.2-16 16c0 44.9 35.8 81.9 80 85.9V456c0 8.8 7.2 16 16 16s16-7.2 16-16v-24.1c44.2-4 80-41 80-85.9 0-47.5-38.5-86-86-86h-20c-29.8 0-54-24.2-54-54s24.2-54 54-54h20c29.8 0 54 24.2 54 54 0 8.8 7.2 16 16 16s16-7.2 16-16c0-44.9-35.8-82-80-86V96c0-8.8-7.2-16-16-16z"/>
+    <!-- Split lines -->
+    <rect x="120" y="248" width="80" height="16" rx="8"/>
+    <rect x="312" y="248" width="80" height="16" rx="8"/>
+  </g>
+</svg>
