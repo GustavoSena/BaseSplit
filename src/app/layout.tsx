@@ -18,6 +18,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <meta name="base:app_id" content={process.env.NEXT_PUBLIC_BASE_APP_ID} />
+      </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>

@@ -54,6 +54,15 @@ export function useSupabaseWeb3Auth() {
     []
   );
 
+  const generateNonce = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let nonce = "";
+    for (let i = 0; i < 16; i++) {
+      nonce += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return nonce;
+  };
+
   const signIn = useCallback(async () => {
     if (!address || !isConnected) {
       setError("Wallet not connected");
@@ -64,8 +73,7 @@ export function useSupabaseWeb3Auth() {
     setError(null);
 
     try {
-      const nonce = crypto.randomUUID();
-      const issuedAt = new Date().toISOString();
+      const nonce = generateNonce();
 
       const message = new SiweMessage({
         domain: window.location.host,
@@ -75,7 +83,6 @@ export function useSupabaseWeb3Auth() {
         version: "1",
         chainId: 8453,
         nonce: nonce,
-        issuedAt: issuedAt,
       });
 
       const messageToSign = message.prepareMessage();
