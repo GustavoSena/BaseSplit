@@ -221,16 +221,27 @@ export default function Home() {
   };
 
   const createPaymentRequest = async () => {
-    if (!user || !newPayerAddress || !newAmount) return;
+    if (!currentWalletAddress || !newPayerAddress || !newAmount) return;
     
     setIsCreating(true);
     setCreateError(null);
     
     try {
+      // Look up profile ID by wallet address
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("wallet_address", currentWalletAddress.toLowerCase())
+        .single();
+      
+      if (profileError || !profileData) {
+        throw new Error("Profile not found. Please sign in again.");
+      }
+      
       const amountInMicroUnits = Math.floor(parseFloat(newAmount) * 1e6);
       
       const { error } = await supabase.from("payment_requests").insert({
-        requester_id: user.id,
+        requester_id: profileData.id,
         payer_wallet_address: newPayerAddress.toLowerCase(),
         amount: amountInMicroUnits,
         memo: newMemo || null,

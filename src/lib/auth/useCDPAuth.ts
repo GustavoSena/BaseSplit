@@ -41,38 +41,27 @@ export function useCDPAuth() {
     async (userId: string, walletAddr: string) => {
       const normalizedWallet = walletAddr.toLowerCase();
       
-      // First check if profile exists by wallet address
-      const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("wallet_address", normalizedWallet)
-        .single();
-      
-      if (existingProfile) {
-        // Update existing profile's id and last_seen_at to link to current user
-        const { error } = await supabase
-          .from("profiles")
-          .update({ 
-            id: userId,
-            last_seen_at: new Date().toISOString() 
-          })
-          .eq("wallet_address", normalizedWallet);
-        
-        if (error) {
-          console.error("Error updating profile:", error);
-          throw error;
-        }
-      } else {
-        // Insert new profile
-        const { error } = await supabase.from("profiles").insert({
-          id: userId,
-          wallet_address: normalizedWallet,
-          last_seen_at: new Date().toISOString(),
-        });
+      // Try to insert first, if duplicate wallet_address, just update last_seen
+      const { error: insertError } = await supabase.from("profiles").insert({
+        id: userId,
+        wallet_address: normalizedWallet,
+        last_seen_at: new Date().toISOString(),
+      });
 
-        if (error) {
-          console.error("Error inserting profile:", error);
-          throw error;
+      if (insertError) {
+        // If duplicate wallet_address, update last_seen_at on existing profile
+        if (insertError.code === "23505") {
+          const { error: updateError } = await supabase
+            .from("profiles")
+            .update({ last_seen_at: new Date().toISOString() })
+            .eq("id", userId);
+          
+          if (updateError && updateError.code !== "PGRST116") {
+            console.error("Error updating profile:", updateError);
+          }
+        } else {
+          console.error("Error inserting profile:", insertError);
+          throw insertError;
         }
       }
     },
