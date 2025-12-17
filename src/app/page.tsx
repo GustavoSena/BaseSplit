@@ -121,6 +121,14 @@ export default function Home() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   
+  // Contact form state
+  const [showAddContactForm, setShowAddContactForm] = useState(false);
+  const [newContactAddress, setNewContactAddress] = useState("");
+  const [newContactLabel, setNewContactLabel] = useState("");
+  const [newContactNote, setNewContactNote] = useState("");
+  const [addContactError, setAddContactError] = useState<string | null>(null);
+  const [isAddingContact, setIsAddingContact] = useState(false);
+  
   // Transaction state
   const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
   
@@ -187,29 +195,88 @@ export default function Home() {
   };
 
   const loadContacts = async () => {
-    if (!user) return;
+    if (!currentWalletAddress) return;
 
     setContactsError(null);
-    const { data, error } = await supabase
-      .from("contacts")
-      .select("*")
-      .order("created_at", { ascending: false });
+    try {
+      // Get profile ID by wallet
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("wallet_address", currentWalletAddress.toLowerCase())
+        .single();
+      
+      if (!profileData) {
+        setContacts([]);
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("*")
+        .eq("owner_id", profileData.id)
+        .order("created_at", { ascending: false });
 
-    if (error) {
-      setContactsError(error.message);
+      if (error) {
+        setContactsError(error.message);
+        setContacts([]);
+      } else {
+        setContacts(data || []);
+      }
+    } catch (err) {
+      setContactsError(err instanceof Error ? err.message : "Failed to load contacts");
       setContacts([]);
-    } else {
-      setContacts(data || []);
+    }
+  };
+  
+  const addContact = async () => {
+    if (!currentWalletAddress || !newContactAddress || !newContactLabel) return;
+    
+    setIsAddingContact(true);
+    setAddContactError(null);
+    
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("wallet_address", currentWalletAddress.toLowerCase())
+        .single();
+      
+      if (profileError || !profileData) {
+        throw new Error("Profile not found. Please sign in again.");
+      }
+      
+      const { error } = await supabase.from("contacts").insert({
+        owner_id: profileData.id,
+        contact_wallet_address: newContactAddress.toLowerCase(),
+        label: newContactLabel,
+        note: newContactNote || null,
+      });
+      
+      if (error) throw error;
+      
+      // Reset form and reload
+      setNewContactAddress("");
+      setNewContactLabel("");
+      setNewContactNote("");
+      setShowAddContactForm(false);
+      await loadContacts();
+    } catch (err) {
+      setAddContactError(err instanceof Error ? err.message : "Failed to add contact");
+    } finally {
+      setIsAddingContact(false);
     }
   };
 
   const loadPaymentRequests = async () => {
-    if (!user) return;
+    if (!currentWalletAddress) return;
 
     setPaymentRequestsError(null);
+    // Only load payment requests where current wallet is the payer (received requests)
     const { data, error } = await supabase
       .from("payment_requests")
       .select("*, profiles!requester_id(wallet_address)")
+      .eq("payer_wallet_address", currentWalletAddress.toLowerCase())
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -430,43 +497,59 @@ export default function Home() {
                 </p>
               </div>
 
-              <button
-                onClick={loadProfile}
-                className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
-              >
-                Load my profile
-              </button>
+              {/* Contacts Section */}
+              <div className="flex gap-2">
+                <button
+                  onClick={loadContacts}
+                  className="flex-1 py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Load Contacts
+                </button>
+                <button
+                  onClick={() => setShowAddContactForm(!showAddContactForm)}
+                  className="flex-1 py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  {showAddContactForm ? "Cancel" : "Add Contact"}
+                </button>
+              </div>
 
-              {profileError && (
-                <p className="text-red-400 text-sm text-center">
-                  {profileError}
-                </p>
-              )}
-
-              {profile && (
-                <div className="bg-gray-900 rounded-lg p-4 space-y-2">
-                  <p className="text-sm text-gray-400">Profile loaded:</p>
-                  <p className="text-white text-sm">
-                    <span className="text-gray-500">Wallet:</span>{" "}
-                    <span className="font-mono">{profile.wallet_address}</span>
-                  </p>
-                  <p className="text-white text-sm">
-                    <span className="text-gray-500">Created:</span>{" "}
-                    {new Date(profile.created_at).toLocaleString()}
-                  </p>
-                  <p className="text-white text-sm">
-                    <span className="text-gray-500">Last seen:</span>{" "}
-                    {new Date(profile.last_seen_at).toLocaleString()}
-                  </p>
+              {/* Add Contact Form */}
+              {showAddContactForm && (
+                <div className="bg-gray-900 rounded-lg p-4 space-y-3">
+                  <p className="text-sm text-gray-400 font-medium">Add New Contact</p>
+                  <input
+                    type="text"
+                    placeholder="Contact label (e.g., Alice)"
+                    value={newContactLabel}
+                    onChange={(e) => setNewContactLabel(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Wallet address (0x...)"
+                    value={newContactAddress}
+                    onChange={(e) => setNewContactAddress(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Note (optional)"
+                    value={newContactNote}
+                    onChange={(e) => setNewContactNote(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  />
+                  {addContactError && (
+                    <p className="text-red-400 text-xs">{addContactError}</p>
+                  )}
+                  <button
+                    onClick={addContact}
+                    disabled={isAddingContact || !newContactAddress || !newContactLabel}
+                    className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+                  >
+                    {isAddingContact ? "Adding..." : "Add Contact"}
+                  </button>
                 </div>
               )}
-
-              <button
-                onClick={loadContacts}
-                className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
-              >
-                Load my contacts
-              </button>
 
               {contactsError && (
                 <p className="text-red-400 text-sm text-center">{contactsError}</p>
@@ -479,6 +562,7 @@ export default function Home() {
                     <div key={c.id} className="text-white text-sm border-b border-gray-700 pb-2">
                       <span className="font-medium">{c.label}</span>
                       <span className="text-gray-500 font-mono text-xs ml-2">{c.contact_wallet_address}</span>
+                      {c.note && <p className="text-gray-400 text-xs mt-1">{c.note}</p>}
                     </div>
                   ))}
                 </div>

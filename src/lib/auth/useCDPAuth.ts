@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useIsSignedIn, useSignOut, useEvmAccounts } from "@coinbase/cdp-hooks";
+import { useIsSignedIn, useSignOut, useCurrentUser } from "@coinbase/cdp-hooks";
 import { supabase } from "@/lib/supabase/client";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -10,7 +10,7 @@ type AuthStatus = "signed_out" | "signing_in" | "signed_in";
 export function useCDPAuth() {
   const { isSignedIn: isCDPSignedIn } = useIsSignedIn();
   const { signOut: cdpSignOut } = useSignOut();
-  const { evmAccounts } = useEvmAccounts();
+  const { currentUser } = useCurrentUser();
 
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -70,10 +70,14 @@ export function useCDPAuth() {
 
   useEffect(() => {
     const syncWithSupabase = async () => {
-      if (isCDPSignedIn && evmAccounts && evmAccounts.length > 0) {
-        const evmAccount = evmAccounts[0];
-        if (evmAccount?.address) {
-          setWalletAddress(evmAccount.address);
+      if (isCDPSignedIn && currentUser) {
+        // Prefer smart account, fallback to EOA
+        const smartAccount = currentUser.evmSmartAccounts?.[0];
+        const eoaAccount = currentUser.evmAccounts?.[0];
+        const accountAddress = smartAccount || eoaAccount;
+        
+        if (accountAddress) {
+          setWalletAddress(accountAddress);
           setStatus("signing_in");
           setError(null);
 
@@ -81,7 +85,7 @@ export function useCDPAuth() {
             const { data, error: authError } = await supabase.auth.signInAnonymously({
               options: {
                 data: {
-                  wallet_address: evmAccount.address.toLowerCase(),
+                  wallet_address: accountAddress.toLowerCase(),
                   auth_provider: "cdp_embedded",
                 },
               },
@@ -90,7 +94,7 @@ export function useCDPAuth() {
             if (authError) throw authError;
 
             if (data.user) {
-              await upsertProfile(data.user.id, evmAccount.address);
+              await upsertProfile(data.user.id, accountAddress);
               setStatus("signed_in");
             }
           } catch (err) {
@@ -103,7 +107,7 @@ export function useCDPAuth() {
     };
 
     syncWithSupabase();
-  }, [isCDPSignedIn, evmAccounts, upsertProfile]);
+  }, [isCDPSignedIn, currentUser, upsertProfile]);
 
   const signOut = useCallback(async () => {
     try {
