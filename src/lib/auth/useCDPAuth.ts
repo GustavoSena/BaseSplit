@@ -39,18 +39,38 @@ export function useCDPAuth() {
 
   const upsertProfile = useCallback(
     async (userId: string, walletAddr: string) => {
-      const { error } = await supabase.from("profiles").upsert(
-        {
+      const normalizedWallet = walletAddr.toLowerCase();
+      
+      // First check if profile exists by wallet address
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("wallet_address", normalizedWallet)
+        .single();
+      
+      if (existingProfile) {
+        // Update existing profile's last_seen_at
+        const { error } = await supabase
+          .from("profiles")
+          .update({ last_seen_at: new Date().toISOString() })
+          .eq("wallet_address", normalizedWallet);
+        
+        if (error) {
+          console.error("Error updating profile:", error);
+          throw error;
+        }
+      } else {
+        // Insert new profile
+        const { error } = await supabase.from("profiles").insert({
           id: userId,
-          wallet_address: walletAddr.toLowerCase(),
+          wallet_address: normalizedWallet,
           last_seen_at: new Date().toISOString(),
-        },
-        { onConflict: "id" }
-      );
+        });
 
-      if (error) {
-        console.error("Error upserting profile:", error);
-        throw error;
+        if (error) {
+          console.error("Error inserting profile:", error);
+          throw error;
+        }
       }
     },
     []
