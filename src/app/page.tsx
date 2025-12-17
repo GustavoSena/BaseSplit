@@ -137,6 +137,9 @@ export default function Home() {
   // Transaction state
   const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
   
+  // Tab state
+  const [activeTab, setActiveTab] = useState<"requests" | "contacts">("requests");
+  
   // Paymaster capabilities
   const { data: availableCapabilities } = useCapabilities({
     account: address,
@@ -441,17 +444,28 @@ export default function Home() {
           {/* Show connected wallet info and balance */}
           {(isConnected || isCDPSignedIn) && (
             <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-              <div className="text-center">
-                <p className="text-sm text-gray-400">Wallet:</p>
-                <p className="text-white font-mono text-sm break-all">
-                  {address || cdpAuth.walletAddress}
+              <div className="flex items-center justify-center gap-2">
+                <p className="text-white font-mono text-sm">
+                  {(address || cdpAuth.walletAddress)?.slice(0, 6)}...{(address || cdpAuth.walletAddress)?.slice(-4)}
                 </p>
+                <button
+                  onClick={() => {
+                    const wallet = address || cdpAuth.walletAddress;
+                    if (wallet) navigator.clipboard.writeText(wallet);
+                  }}
+                  className="p-1 hover:bg-gray-700 rounded transition-colors"
+                  title="Copy address"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
               </div>
               <div className="text-center border-t border-gray-700 pt-3">
-                <p className="text-sm text-gray-400">USDC Balance:</p>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-3xl font-bold text-white">
                   ${formattedBalance}
                 </p>
+                <p className="text-xs text-gray-500">USDC</p>
               </div>
             </div>
           )}
@@ -497,262 +511,279 @@ export default function Home() {
 
           {isAuthenticated && user && (
             <div className="border-t border-gray-700 pt-6 space-y-4">
-              <div className="text-center">
-                <p className="text-sm text-gray-400">User ID:</p>
-                <p className="text-white font-mono text-xs break-all">
-                  {user.id}
-                </p>
-              </div>
-
-              {/* Contacts Section */}
-              <div className="flex gap-2">
+              {/* Tab Navigation */}
+              <div className="flex rounded-lg bg-gray-900 p-1">
                 <button
-                  onClick={loadContacts}
-                  className="flex-1 py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
+                  onClick={() => {
+                    setActiveTab("requests");
+                    loadPaymentRequests();
+                  }}
+                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === "requests"
+                      ? "bg-gray-700 text-white"
+                      : "text-gray-400 hover:text-white"
+                  }`}
                 >
-                  Load Contacts
-                </button>
-                <button
-                  onClick={() => setShowAddContactForm(!showAddContactForm)}
-                  className="flex-1 py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
-                >
-                  {showAddContactForm ? "Cancel" : "Add Contact"}
-                </button>
-              </div>
-
-              {/* Add Contact Form */}
-              {showAddContactForm && (
-                <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-                  <p className="text-sm text-gray-400 font-medium">Add New Contact</p>
-                  <input
-                    type="text"
-                    placeholder="Contact label (e.g., Alice)"
-                    value={newContactLabel}
-                    onChange={(e) => setNewContactLabel(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Wallet address (0x...)"
-                    value={newContactAddress}
-                    onChange={(e) => setNewContactAddress(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Note (optional)"
-                    value={newContactNote}
-                    onChange={(e) => setNewContactNote(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                  />
-                  {addContactError && (
-                    <p className="text-red-400 text-xs">{addContactError}</p>
-                  )}
-                  <button
-                    onClick={addContact}
-                    disabled={isAddingContact || !newContactAddress || !newContactLabel}
-                    className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
-                  >
-                    {isAddingContact ? "Adding..." : "Add Contact"}
-                  </button>
-                </div>
-              )}
-
-              {contactsError && (
-                <p className="text-red-400 text-sm text-center">{contactsError}</p>
-              )}
-
-              {contacts.length > 0 ? (
-                <div className="bg-gray-900 rounded-lg p-4 space-y-2">
-                  <p className="text-sm text-gray-400">Contacts ({contacts.length}):</p>
-                  {contacts.map((c) => (
-                    <div key={c.id} className="text-white text-sm border-b border-gray-700 pb-2">
-                      <span className="font-medium">{c.label}</span>
-                      <span className="text-gray-500 font-mono text-xs ml-2">{c.contact_wallet_address}</span>
-                      {c.note && <p className="text-gray-400 text-xs mt-1">{c.note}</p>}
-                    </div>
-                  ))}
-                </div>
-              ) : contacts.length === 0 && !contactsError && (
-                <p className="text-gray-500 text-sm text-center">No contacts yet</p>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={loadPaymentRequests}
-                  className="flex-1 py-2 px-4 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg transition-colors"
-                >
-                  Load Requests
+                  Requests
                 </button>
                 <button
                   onClick={() => {
-                    const newState = !showCreateForm;
-                    setShowCreateForm(newState);
-                    if (newState) {
-                      loadContacts(); // Load contacts when opening form
-                    } else {
-                      setContactSearch("");
-                      setShowContactDropdown(false);
-                      setNewPayerAddress("");
-                    }
+                    setActiveTab("contacts");
+                    loadContacts();
                   }}
-                  className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                  className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === "contacts"
+                      ? "bg-gray-700 text-white"
+                      : "text-gray-400 hover:text-white"
+                  }`}
                 >
-                  {showCreateForm ? "Cancel" : "Create Request"}
+                  Contacts
                 </button>
               </div>
 
-              {/* Create Payment Request Form */}
-              {showCreateForm && (
-                <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-                  <p className="text-sm text-gray-400 font-medium">New Payment Request</p>
-                  
-                  {/* Contact Search / Payer Address */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search contacts or enter wallet address..."
-                      value={contactSearch || newPayerAddress}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setContactSearch(value);
-                        // If it looks like an address, set it directly
-                        if (value.startsWith("0x")) {
-                          setNewPayerAddress(value);
-                        }
-                        setShowContactDropdown(value.length > 0 && !value.startsWith("0x"));
-                      }}
-                      onFocus={() => {
-                        if (contacts.length > 0 && !newPayerAddress.startsWith("0x")) {
-                          setShowContactDropdown(true);
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                    />
-                    
-                    {/* Contact Dropdown */}
-                    {showContactDropdown && contacts.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                        {contacts
-                          .filter(c => 
-                            contactSearch === "" ||
-                            c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
-                            c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
-                          )
-                          .map((c) => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onClick={() => {
-                                setNewPayerAddress(c.contact_wallet_address);
-                                setContactSearch(c.label);
-                                setShowContactDropdown(false);
-                              }}
-                              className="w-full px-3 py-2 text-left hover:bg-gray-700 text-white text-sm flex justify-between items-center"
-                            >
-                              <span className="font-medium">{c.label}</span>
-                              <span className="text-gray-500 text-xs font-mono truncate ml-2">
-                                {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
-                              </span>
-                            </button>
-                          ))}
-                        {contacts.filter(c => 
-                          contactSearch === "" ||
-                          c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
-                          c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
-                        ).length === 0 && (
-                          <p className="px-3 py-2 text-gray-500 text-sm">No matching contacts</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {newPayerAddress && (
-                    <p className="text-xs text-gray-500 font-mono truncate">
-                      To: {newPayerAddress}
-                    </p>
-                  )}
-                  
-                  <input
-                    type="number"
-                    placeholder="Amount (USDC)"
-                    value={newAmount}
-                    onChange={(e) => setNewAmount(e.target.value)}
-                    step="0.01"
-                    min="0"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Memo (optional)"
-                    value={newMemo}
-                    onChange={(e) => setNewMemo(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                  />
-                  {createError && (
-                    <p className="text-red-400 text-xs">{createError}</p>
-                  )}
+              {/* Contacts Tab */}
+              {activeTab === "contacts" && (
+                <>
                   <button
-                    onClick={createPaymentRequest}
-                    disabled={isCreating || !newPayerAddress || !newAmount}
-                    className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+                    onClick={() => setShowAddContactForm(!showAddContactForm)}
+                    className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
                   >
-                    {isCreating ? "Creating..." : "Create Request"}
+                    {showAddContactForm ? "Cancel" : "Add Contact"}
                   </button>
-                </div>
-              )}
 
-              {paymentRequestsError && (
-                <p className="text-red-400 text-sm text-center">{paymentRequestsError}</p>
-              )}
+                  {/* Add Contact Form */}
+                  {showAddContactForm && (
+                    <div className="bg-gray-900 rounded-lg p-4 space-y-3">
+                      <p className="text-sm text-gray-400 font-medium">Add New Contact</p>
+                      <input
+                        type="text"
+                        placeholder="Contact label (e.g., Alice)"
+                        value={newContactLabel}
+                        onChange={(e) => setNewContactLabel(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Wallet address (0x...)"
+                        value={newContactAddress}
+                        onChange={(e) => setNewContactAddress(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Note (optional)"
+                        value={newContactNote}
+                        onChange={(e) => setNewContactNote(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                      />
+                      {addContactError && (
+                        <p className="text-red-400 text-xs">{addContactError}</p>
+                      )}
+                      <button
+                        onClick={addContact}
+                        disabled={isAddingContact || !newContactAddress || !newContactLabel}
+                        className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+                      >
+                        {isAddingContact ? "Adding..." : "Add Contact"}
+                      </button>
+                    </div>
+                  )}
 
-              {paymentRequests.length > 0 ? (
-                <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-                  <p className="text-sm text-gray-400">Payment Requests ({paymentRequests.length}):</p>
-                  {paymentRequests.map((pr) => {
-                    const currentWallet = (address || cdpAuth.walletAddress)?.toLowerCase();
-                    const canPay = pr.status === "pending" && currentWallet === pr.payer_wallet_address;
-                    const isPaying = payingRequestId === pr.id;
-                    
-                    return (
-                      <div key={pr.id} className="text-white text-sm border-b border-gray-700 pb-3">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
-                          <span className={`text-xs px-2 py-0.5 rounded ${
-                            pr.status === "paid" ? "bg-green-800 text-green-300" :
-                            pr.status === "pending" ? "bg-yellow-800 text-yellow-300" :
-                            "bg-gray-700 text-gray-300"
-                          }`}>{pr.status}</span>
+                  {contactsError && (
+                    <p className="text-red-400 text-sm text-center">{contactsError}</p>
+                  )}
+
+                  {contacts.length > 0 ? (
+                    <div className="bg-gray-900 rounded-lg p-4 space-y-2">
+                      {contacts.map((c) => (
+                        <div key={c.id} className="text-white text-sm border-b border-gray-700 pb-2 last:border-0">
+                          <span className="font-medium">{c.label}</span>
+                          <span className="text-gray-500 font-mono text-xs ml-2">
+                            {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
+                          </span>
+                          {c.note && <p className="text-gray-400 text-xs mt-1">{c.note}</p>}
                         </div>
-                        <p className="text-gray-500 font-mono text-xs mt-1">To: {pr.payer_wallet_address}</p>
-                        {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
-                        {pr.tx_hash && (
-                          <a 
-                            href={`https://basescan.org/tx/${pr.tx_hash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 text-xs hover:underline"
-                          >
-                            View transaction
-                          </a>
-                        )}
-                        {canPay && (
-                          <button
-                            onClick={() => payPaymentRequest(pr)}
-                            disabled={isPaying || isSending || isConfirming}
-                            className="mt-2 w-full py-1.5 px-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                          >
-                            {isPaying && isSending ? "Sending..." : 
-                             isPaying && isConfirming ? "Confirming..." : 
-                             "Pay Now"}
-                          </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm text-center">No contacts yet</p>
+                  )}
+                </>
+              )}
+
+              {/* Requests Tab */}
+              {activeTab === "requests" && (
+                <>
+                  <button
+                    onClick={() => {
+                      const newState = !showCreateForm;
+                      setShowCreateForm(newState);
+                      if (newState) {
+                        loadContacts(); // Load contacts when opening form
+                      } else {
+                        setContactSearch("");
+                        setShowContactDropdown(false);
+                        setNewPayerAddress("");
+                      }
+                    }}
+                    className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                  >
+                    {showCreateForm ? "Cancel" : "Create Request"}
+                  </button>
+
+                  {/* Create Payment Request Form */}
+                  {showCreateForm && (
+                    <div className="bg-gray-900 rounded-lg p-4 space-y-3">
+                      <p className="text-sm text-gray-400 font-medium">New Payment Request</p>
+                      
+                      {/* Contact Search / Payer Address */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search contacts or enter wallet address..."
+                          value={contactSearch || newPayerAddress}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setContactSearch(value);
+                            if (value.startsWith("0x")) {
+                              setNewPayerAddress(value);
+                            }
+                            setShowContactDropdown(value.length > 0 && !value.startsWith("0x"));
+                          }}
+                          onFocus={() => {
+                            if (contacts.length > 0 && !newPayerAddress.startsWith("0x")) {
+                              setShowContactDropdown(true);
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                        />
+                        
+                        {/* Contact Dropdown */}
+                        {showContactDropdown && contacts.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                            {contacts
+                              .filter(c => 
+                                contactSearch === "" ||
+                                c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
+                                c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
+                              )
+                              .map((c) => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setNewPayerAddress(c.contact_wallet_address);
+                                    setContactSearch(c.label);
+                                    setShowContactDropdown(false);
+                                  }}
+                                  className="w-full px-3 py-2 text-left hover:bg-gray-700 text-white text-sm flex justify-between items-center"
+                                >
+                                  <span className="font-medium">{c.label}</span>
+                                  <span className="text-gray-500 text-xs font-mono truncate ml-2">
+                                    {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
+                                  </span>
+                                </button>
+                              ))}
+                            {contacts.filter(c => 
+                              contactSearch === "" ||
+                              c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
+                              c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
+                            ).length === 0 && (
+                              <p className="px-3 py-2 text-gray-500 text-sm">No matching contacts</p>
+                            )}
+                          </div>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              ) : paymentRequests.length === 0 && !paymentRequestsError && (
-                <p className="text-gray-500 text-sm text-center">No payment requests yet</p>
+                      
+                      {newPayerAddress && (
+                        <p className="text-xs text-gray-500 font-mono truncate">
+                          To: {newPayerAddress}
+                        </p>
+                      )}
+                      
+                      <input
+                        type="number"
+                        placeholder="Amount (USDC)"
+                        value={newAmount}
+                        onChange={(e) => setNewAmount(e.target.value)}
+                        step="0.01"
+                        min="0"
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Memo (optional)"
+                        value={newMemo}
+                        onChange={(e) => setNewMemo(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                      />
+                      {createError && (
+                        <p className="text-red-400 text-xs">{createError}</p>
+                      )}
+                      <button
+                        onClick={createPaymentRequest}
+                        disabled={isCreating || !newPayerAddress || !newAmount}
+                        className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+                      >
+                        {isCreating ? "Creating..." : "Create Request"}
+                      </button>
+                    </div>
+                  )}
+
+                  {paymentRequestsError && (
+                    <p className="text-red-400 text-sm text-center">{paymentRequestsError}</p>
+                  )}
+
+                  {paymentRequests.length > 0 ? (
+                    <div className="bg-gray-900 rounded-lg p-4 space-y-3">
+                      {paymentRequests.map((pr) => {
+                        const currentWallet = (address || cdpAuth.walletAddress)?.toLowerCase();
+                        const canPay = pr.status === "pending" && currentWallet === pr.payer_wallet_address;
+                        const isPaying = payingRequestId === pr.id;
+                        
+                        return (
+                          <div key={pr.id} className="text-white text-sm border-b border-gray-700 pb-3 last:border-0">
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
+                              <span className={`text-xs px-2 py-0.5 rounded ${
+                                pr.status === "paid" ? "bg-green-800 text-green-300" :
+                                pr.status === "pending" ? "bg-yellow-800 text-yellow-300" :
+                                "bg-gray-700 text-gray-300"
+                              }`}>{pr.status}</span>
+                            </div>
+                            <p className="text-gray-500 font-mono text-xs mt-1">
+                              From: {pr.profiles?.wallet_address?.slice(0, 6)}...{pr.profiles?.wallet_address?.slice(-4)}
+                            </p>
+                            {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
+                            {pr.tx_hash && (
+                              <a 
+                                href={`https://basescan.org/tx/${pr.tx_hash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-400 text-xs hover:underline"
+                              >
+                                View transaction
+                              </a>
+                            )}
+                            {canPay && (
+                              <button
+                                onClick={() => payPaymentRequest(pr)}
+                                disabled={isPaying || isSending || isConfirming}
+                                className="mt-2 w-full py-1.5 px-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                              >
+                                {isPaying && isSending ? "Sending..." : 
+                                 isPaying && isConfirming ? "Confirming..." : 
+                                 "Pay Now"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm text-center">No payment requests yet</p>
+                  )}
+                </>
               )}
             </div>
           )}
