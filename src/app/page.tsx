@@ -55,7 +55,6 @@ interface PaymentRequest {
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
-  const [authMethod, setAuthMethod] = useState<"wallet" | "social">("wallet");
   
   const { address, isConnected } = useAccount();
   const { isSignedIn: isCDPSignedIn } = useIsSignedIn();
@@ -63,12 +62,9 @@ export default function Home() {
   const walletAuth = useSupabaseWeb3Auth();
   const cdpAuth = useCDPAuth();
   
-  const isAuthenticated = authMethod === "wallet" 
-    ? walletAuth.isAuthenticated 
-    : cdpAuth.isAuthenticated;
-  const user = authMethod === "wallet" ? walletAuth.user : cdpAuth.user;
-  const authError = authMethod === "wallet" ? walletAuth.error : cdpAuth.error;
-  const authStatus = authMethod === "wallet" ? walletAuth.status : cdpAuth.status;
+  const isAuthenticated = walletAuth.isAuthenticated || cdpAuth.isAuthenticated;
+  const user = walletAuth.user || cdpAuth.user;
+  const authError = walletAuth.error || cdpAuth.error;
   
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -158,33 +154,24 @@ export default function Home() {
         </div>
 
         <div className="space-y-6">
-          {/* Auth Method Toggle */}
-          <div className="flex justify-center gap-2">
-            <button
-              onClick={() => setAuthMethod("wallet")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                authMethod === "wallet"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-              }`}
-            >
-              Connect Wallet
-            </button>
-            <button
-              onClick={() => setAuthMethod("social")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                authMethod === "social"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-              }`}
-            >
-              Social Login
-            </button>
-          </div>
-
-          {/* Wallet Connect Method */}
-          {authMethod === "wallet" && (
+          {/* Show login options only if not authenticated */}
+          {!isAuthenticated && (
             <>
+              {/* Social Login - CDP Embedded Wallet */}
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-gray-400 text-sm text-center">
+                  Sign in with email or social
+                </p>
+                <AuthButton />
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="flex-1 h-px bg-gray-700" />
+                <span className="text-gray-500 text-sm">or</span>
+                <div className="flex-1 h-px bg-gray-700" />
+              </div>
+
+              {/* Connect Wallet - OnchainKit */}
               <div className="flex justify-center">
                 <Wallet>
                   <ConnectWallet>
@@ -201,40 +188,28 @@ export default function Home() {
                   </WalletDropdown>
                 </Wallet>
               </div>
-
-              {isConnected && address && (
-                <div className="text-center">
-                  <p className="text-sm text-gray-400">Connected:</p>
-                  <p className="text-white font-mono text-sm break-all">{address}</p>
-                </div>
-              )}
-
-              {isConnected && !walletAuth.isAuthenticated && (
-                <button
-                  onClick={walletAuth.signIn}
-                  disabled={walletAuth.status === "signing_in"}
-                  className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
-                >
-                  {walletAuth.status === "signing_in" ? "Signing in..." : "Sign in to Supabase"}
-                </button>
-              )}
             </>
           )}
 
-          {/* Social Login Method */}
-          {authMethod === "social" && (
-            <div className="flex flex-col items-center gap-4">
-              <p className="text-gray-400 text-sm text-center">
-                Sign in with email or social to create an embedded wallet
+          {/* Show connected wallet info */}
+          {(isConnected || isCDPSignedIn) && (
+            <div className="text-center">
+              <p className="text-sm text-gray-400">Wallet:</p>
+              <p className="text-white font-mono text-sm break-all">
+                {address || cdpAuth.walletAddress}
               </p>
-              <AuthButton />
-              {isCDPSignedIn && cdpAuth.walletAddress && (
-                <div className="text-center">
-                  <p className="text-sm text-gray-400">Embedded Wallet:</p>
-                  <p className="text-white font-mono text-sm break-all">{cdpAuth.walletAddress}</p>
-                </div>
-              )}
             </div>
+          )}
+
+          {/* Sign in to Supabase if wallet connected but not authenticated */}
+          {isConnected && !walletAuth.isAuthenticated && !isCDPSignedIn && (
+            <button
+              onClick={walletAuth.signIn}
+              disabled={walletAuth.status === "signing_in"}
+              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+            >
+              {walletAuth.status === "signing_in" ? "Signing in..." : "Sign in to Supabase"}
+            </button>
           )}
 
           {/* Auth Status */}
@@ -244,17 +219,10 @@ export default function Home() {
                 className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                   isAuthenticated
                     ? "bg-green-900 text-green-300"
-                    : authStatus === "signing_in"
-                    ? "bg-yellow-900 text-yellow-300"
                     : "bg-gray-700 text-gray-300"
                 }`}
               >
-                Supabase:{" "}
-                {isAuthenticated
-                  ? "authenticated"
-                  : authStatus === "signing_in"
-                  ? "signing in..."
-                  : "signed out"}
+                Supabase: {isAuthenticated ? "authenticated" : "signed out"}
               </span>
             </div>
 
@@ -264,7 +232,7 @@ export default function Home() {
 
             {isAuthenticated && (
               <button
-                onClick={authMethod === "wallet" ? walletAuth.signOut : cdpAuth.signOut}
+                onClick={walletAuth.isAuthenticated ? walletAuth.signOut : cdpAuth.signOut}
                 className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
               >
                 Sign out
