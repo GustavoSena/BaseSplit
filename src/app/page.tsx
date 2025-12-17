@@ -89,13 +89,16 @@ export default function Home() {
   
   const currentWalletAddress = address || cdpAuth.walletAddress;
   
-  // USDC Balance
-  const { data: usdcBalance } = useReadContract({
+  // USDC Balance with periodic refresh
+  const { data: usdcBalance, refetch: refetchBalance } = useReadContract({
     address: USDC_BASE_MAINNET as `0x${string}`,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: currentWalletAddress ? [currentWalletAddress as `0x${string}`] : undefined,
-    query: { enabled: !!currentWalletAddress },
+    query: { 
+      enabled: !!currentWalletAddress,
+      refetchInterval: 10000, // Refresh every 10 seconds
+    },
   });
   
   const formattedBalance = usdcBalance 
@@ -120,6 +123,8 @@ export default function Home() {
   const [newMemo, setNewMemo] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
+  const [showContactDropdown, setShowContactDropdown] = useState(false);
   
   // Contact form state
   const [showAddContactForm, setShowAddContactForm] = useState(false);
@@ -320,6 +325,8 @@ export default function Home() {
       setNewPayerAddress("");
       setNewAmount("");
       setNewMemo("");
+      setContactSearch("");
+      setShowContactDropdown(false);
       setShowCreateForm(false);
       await loadPaymentRequests();
     } catch (err) {
@@ -578,7 +585,17 @@ export default function Home() {
                   Load Requests
                 </button>
                 <button
-                  onClick={() => setShowCreateForm(!showCreateForm)}
+                  onClick={() => {
+                    const newState = !showCreateForm;
+                    setShowCreateForm(newState);
+                    if (newState) {
+                      loadContacts(); // Load contacts when opening form
+                    } else {
+                      setContactSearch("");
+                      setShowContactDropdown(false);
+                      setNewPayerAddress("");
+                    }
+                  }}
                   className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
                 >
                   {showCreateForm ? "Cancel" : "Create Request"}
@@ -589,13 +606,73 @@ export default function Home() {
               {showCreateForm && (
                 <div className="bg-gray-900 rounded-lg p-4 space-y-3">
                   <p className="text-sm text-gray-400 font-medium">New Payment Request</p>
-                  <input
-                    type="text"
-                    placeholder="Payer wallet address (0x...)"
-                    value={newPayerAddress}
-                    onChange={(e) => setNewPayerAddress(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                  />
+                  
+                  {/* Contact Search / Payer Address */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search contacts or enter wallet address..."
+                      value={contactSearch || newPayerAddress}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setContactSearch(value);
+                        // If it looks like an address, set it directly
+                        if (value.startsWith("0x")) {
+                          setNewPayerAddress(value);
+                        }
+                        setShowContactDropdown(value.length > 0 && !value.startsWith("0x"));
+                      }}
+                      onFocus={() => {
+                        if (contacts.length > 0 && !newPayerAddress.startsWith("0x")) {
+                          setShowContactDropdown(true);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                    />
+                    
+                    {/* Contact Dropdown */}
+                    {showContactDropdown && contacts.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {contacts
+                          .filter(c => 
+                            contactSearch === "" ||
+                            c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
+                            c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
+                          )
+                          .map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setNewPayerAddress(c.contact_wallet_address);
+                                setContactSearch(c.label);
+                                setShowContactDropdown(false);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-gray-700 text-white text-sm flex justify-between items-center"
+                            >
+                              <span className="font-medium">{c.label}</span>
+                              <span className="text-gray-500 text-xs font-mono truncate ml-2">
+                                {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
+                              </span>
+                            </button>
+                          ))}
+                        {contacts.filter(c => 
+                          contactSearch === "" ||
+                          c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
+                          c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
+                        ).length === 0 && (
+                          <p className="px-3 py-2 text-gray-500 text-sm">No matching contacts</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {newPayerAddress && (
+                    <p className="text-xs text-gray-500 font-mono truncate">
+                      To: {newPayerAddress}
+                    </p>
+                  )}
+                  
                   <input
                     type="number"
                     placeholder="Amount (USDC)"
