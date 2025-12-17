@@ -49,10 +49,13 @@ export function useCDPAuth() {
         .single();
       
       if (existingProfile) {
-        // Update existing profile's last_seen_at
+        // Update existing profile's id and last_seen_at to link to current user
         const { error } = await supabase
           .from("profiles")
-          .update({ last_seen_at: new Date().toISOString() })
+          .update({ 
+            id: userId,
+            last_seen_at: new Date().toISOString() 
+          })
           .eq("wallet_address", normalizedWallet);
         
         if (error) {
