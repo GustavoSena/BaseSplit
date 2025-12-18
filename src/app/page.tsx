@@ -78,9 +78,6 @@ interface PaymentRequest {
   profiles?: { wallet_address: string };
 }
 
-// Force dynamic rendering - this page uses client-side only features
-export const dynamic = "force-dynamic";
-
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   

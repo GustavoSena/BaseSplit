@@ -1,18 +1,9 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-// Only create client if we have the required env vars (client-side only)
-function createSupabaseClient(): SupabaseClient {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    // Return a dummy client during build - it won't be used
-    return {} as SupabaseClient;
-  }
-  return createClient(supabaseUrl, supabaseAnonKey);
-}
-
-export const supabase = createSupabaseClient();
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function getSession() {
   const { data, error } = await supabase.auth.getSession();
