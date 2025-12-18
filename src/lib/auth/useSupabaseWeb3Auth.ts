@@ -9,6 +9,22 @@ import type { Session, User } from "@supabase/supabase-js";
 
 type AuthStatus = "signed_out" | "signing_in" | "signed_in";
 
+/**
+ * Manages Supabase authentication using a Web3 wallet and exposes session state and auth actions.
+ *
+ * Provides the current Supabase session and user, an auth status, an error message if present,
+ * functions to sign in (via SIWE message signed by the connected wallet) and sign out, and a boolean
+ * indicating whether the user is authenticated.
+ *
+ * @returns An object with:
+ *  - `session`: the current Supabase `Session` or `null`,
+ *  - `user`: the current Supabase `User` or `null`,
+ *  - `status`: authentication status (`"signed_out" | "signing_in" | "signed_in"`),
+ *  - `error`: an error message string or `null`,
+ *  - `signIn`: a function that initiates the SIWE sign-in flow using the connected wallet,
+ *  - `signOut`: a function that signs the user out of Supabase,
+ *  - `isAuthenticated`: `true` if `status` is `"signed_in"`, `false` otherwise.
+ */
 export function useSupabaseWeb3Auth() {
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();

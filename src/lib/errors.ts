@@ -35,21 +35,30 @@ export const APP_ERRORS = {
 } as const;
 
 /**
- * Check if an error is a PostgreSQL unique violation
+ * Determines whether an error code indicates a PostgreSQL unique constraint violation.
+ *
+ * @param errorCode - The error code to check (may be `undefined`).
+ * @returns `true` if `errorCode` equals `PG_ERRORS.UNIQUE_VIOLATION`, `false` otherwise.
  */
 export function isUniqueViolation(errorCode: string | undefined): boolean {
   return errorCode === PG_ERRORS.UNIQUE_VIOLATION;
 }
 
 /**
- * Check if an error is a PostgREST "no rows returned" error
+ * Determines whether the provided error code indicates PostgREST returned no rows.
+ *
+ * @param errorCode - The error code to check; may be `undefined`.
+ * @returns `true` if `errorCode` equals `POSTGREST_ERRORS.NO_ROWS_RETURNED`, `false` otherwise.
  */
 export function isNoRowsError(errorCode: string | undefined): boolean {
   return errorCode === POSTGREST_ERRORS.NO_ROWS_RETURNED;
 }
 
 /**
- * Get a user-friendly error message
+ * Map a known error code to a user-facing message.
+ *
+ * @param errorCode - The error code to map (may be `undefined`)
+ * @returns A user-facing message corresponding to `errorCode`, or `"An error occurred"` if the code is unrecognized
  */
 export function getErrorMessage(errorCode: string | undefined): string {
   switch (errorCode) {
