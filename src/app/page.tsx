@@ -209,6 +209,13 @@ export default function Home() {
     setMounted(true);
   }, []);
   
+  // Refetch balance when wallet address changes
+  useEffect(() => {
+    if (currentWalletAddress) {
+      refetchBalance();
+    }
+  }, [currentWalletAddress, refetchBalance]);
+  
   // Update payment request status when transaction is confirmed
   useEffect(() => {
     if (isConfirmed && txHash && payingRequestId) {
@@ -427,165 +434,146 @@ export default function Home() {
     );
   }
 
-  return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-black">
-      <div className="bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">BaseSplit</h1>
-          <p className="text-gray-400">Split expenses on Base</p>
-        </div>
+  // Navigation items for the navbar
+  const navItems = [
+    { id: "requests" as const, label: "Requests", icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      </svg>
+    )},
+    { id: "contacts" as const, label: "Contacts", icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    )},
+    { id: "settings" as const, label: "Settings", icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    )},
+  ];
 
-        <div className="space-y-6">
-          {/* Show login options only if not authenticated */}
-          {!isAuthenticated && (
-            <>
-              {/* Social Login - CDP Embedded Wallet */}
-              <div className="flex flex-col items-center gap-3">
-                <p className="text-gray-400 text-sm text-center">
-                  Sign in with email or social
-                </p>
-                <AuthButton />
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="flex-1 h-px bg-gray-700" />
-                <span className="text-gray-500 text-sm">or</span>
-                <div className="flex-1 h-px bg-gray-700" />
-              </div>
-
-              {/* Connect Wallet - OnchainKit */}
-              <div className="flex justify-center">
-                <Wallet>
-                  <ConnectWallet>
-                    <Avatar className="h-6 w-6" />
-                    <Name />
-                  </ConnectWallet>
-                  <WalletDropdown>
-                    <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
-                      <Avatar />
-                      <Name />
-                      <Address />
-                    </Identity>
-                    <WalletDropdownDisconnect />
-                  </WalletDropdown>
-                </Wallet>
-              </div>
-            </>
-          )}
-
-          {/* Show connected wallet info and balance */}
-          {(isConnected || isCDPSignedIn) && (
-            <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-center gap-2">
-                <p className="text-white font-mono text-sm">
-                  {(address || cdpAuth.walletAddress)?.slice(0, 6)}...{(address || cdpAuth.walletAddress)?.slice(-4)}
-                </p>
-                <button
-                  onClick={() => {
-                    const wallet = address || cdpAuth.walletAddress;
-                    if (wallet) navigator.clipboard.writeText(wallet);
-                  }}
-                  className="p-1 hover:bg-gray-700 rounded transition-colors"
-                  title="Copy address"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </button>
-              </div>
-              <div className="text-center border-t border-gray-700 pt-3">
-                <p className="text-3xl font-bold text-white">
-                  ${formattedBalance}
-                </p>
-                <p className="text-xs text-gray-500">USDC</p>
-              </div>
-            </div>
-          )}
-
-          {/* Sign in to Supabase if wallet connected but not authenticated */}
-          {isConnected && !walletAuth.isAuthenticated && !isCDPSignedIn && (
-            <button
-              onClick={walletAuth.signIn}
-              disabled={walletAuth.status === "signing_in"}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
-            >
-              {walletAuth.status === "signing_in" ? "Signing in..." : "Sign in to Supabase"}
-            </button>
-          )}
-
-          {/* Auth Status */}
-          <div className="border-t border-gray-700 pt-6">
-            <div className="text-center mb-4">
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                  isAuthenticated
-                    ? "bg-green-900 text-green-300"
-                    : "bg-gray-700 text-gray-300"
-                }`}
-              >
-                Supabase: {isAuthenticated ? "authenticated" : "signed out"}
-              </span>
-            </div>
-
-            {authError && (
-              <p className="text-red-400 text-sm text-center mb-4">{authError}</p>
-            )}
-
-            {isAuthenticated && (
-              <button
-                onClick={walletAuth.isAuthenticated ? walletAuth.signOut : cdpAuth.signOut}
-                className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
-              >
-                Sign out
-              </button>
-            )}
+  // Not authenticated - show login screen
+  if (!isAuthenticated) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-black px-4">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold text-white mb-2">BaseSplit</h1>
+            <p className="text-gray-400">Split expenses on Base</p>
           </div>
 
-          {isAuthenticated && user && (
-            <div className="border-t border-gray-700 pt-6 space-y-4">
-              {/* Tab Navigation */}
-              <div className="flex rounded-lg bg-gray-900 p-1">
-                <button
-                  onClick={() => {
-                    setActiveTab("requests");
-                    loadPaymentRequests();
-                  }}
-                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
-                    activeTab === "requests"
-                      ? "bg-gray-700 text-white"
-                      : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  Requests
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab("contacts");
-                    loadContacts();
-                  }}
-                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
-                    activeTab === "contacts"
-                      ? "bg-gray-700 text-white"
-                      : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  Contacts
-                </button>
-                <button
-                  onClick={() => setActiveTab("settings")}
-                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
-                    activeTab === "settings"
-                      ? "bg-gray-700 text-white"
-                      : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  Settings
-                </button>
-              </div>
+          <div className="space-y-4">
+            {/* Social Login - CDP Embedded Wallet */}
+            <div className="flex flex-col items-center gap-3">
+              <AuthButton />
+            </div>
 
-              {/* Contacts Tab */}
-              {activeTab === "contacts" && (
-                <>
+            <div className="flex items-center gap-4">
+              <div className="flex-1 h-px bg-gray-700" />
+              <span className="text-gray-500 text-sm">or</span>
+              <div className="flex-1 h-px bg-gray-700" />
+            </div>
+
+            {/* Connect Wallet - OnchainKit */}
+            <div className="flex justify-center">
+              <Wallet>
+                <ConnectWallet>
+                  <Avatar className="h-6 w-6" />
+                  <Name />
+                </ConnectWallet>
+                <WalletDropdown>
+                  <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+                    <Avatar />
+                    <Name />
+                    <Address />
+                  </Identity>
+                  <WalletDropdownDisconnect />
+                </WalletDropdown>
+              </Wallet>
+            </div>
+
+            {/* Sign in to Supabase if wallet connected */}
+            {isConnected && !walletAuth.isAuthenticated && (
+              <button
+                onClick={walletAuth.signIn}
+                disabled={walletAuth.status === "signing_in"}
+                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+              >
+                {walletAuth.status === "signing_in" ? "Signing in..." : "Continue"}
+              </button>
+            )}
+
+            {authError && (
+              <p className="text-red-400 text-sm text-center">{authError}</p>
+            )}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Authenticated - show app
+  return (
+    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black flex flex-col">
+      {/* Desktop Header */}
+      <header className="hidden md:block bg-gray-800/80 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            <h1 className="text-xl font-bold text-white">BaseSplit</h1>
+            <nav className="flex items-center gap-1">
+              {navItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    if (item.id === "requests") loadPaymentRequests();
+                    if (item.id === "contacts") loadContacts();
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    activeTab === item.id
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-400 hover:text-white hover:bg-gray-700"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto pb-20 md:pb-8">
+        <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+          {/* Balance Card */}
+          <div className="bg-gray-800 rounded-2xl p-6 text-center">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <p className="text-gray-400 font-mono text-sm">
+                {currentWalletAddress?.slice(0, 6)}...{currentWalletAddress?.slice(-4)}
+              </p>
+              <button
+                onClick={() => {
+                  if (currentWalletAddress) navigator.clipboard.writeText(currentWalletAddress);
+                }}
+                className="p-1 hover:bg-gray-700 rounded transition-colors"
+                title="Copy address"
+              >
+                <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-4xl font-bold text-white">${formattedBalance}</p>
+            <p className="text-gray-500 text-sm">USDC Balance</p>
+          </div>
+
+          {/* Tab Content */}
+          {/* Contacts Tab */}
+          {activeTab === "contacts" && (
+            <>
                   <button
                     onClick={() => setShowAddContactForm(!showAddContactForm)}
                     className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
@@ -650,11 +638,11 @@ export default function Home() {
                   ) : (
                     <p className="text-gray-500 text-sm text-center">No contacts yet</p>
                   )}
-                </>
-              )}
+            </>
+          )}
 
-              {/* Settings Tab */}
-              {activeTab === "settings" && (
+          {/* Settings Tab */}
+          {activeTab === "settings" && (
                 <div className="space-y-4">
                   <h3 className="text-white font-medium">Wallet Settings</h3>
                   
@@ -722,16 +710,18 @@ export default function Home() {
                     </p>
                   )}
                   
-                  <div className="border-t border-gray-700 pt-4">
-                    <p className="text-sm text-gray-400 mb-2">App Info</p>
-                    <p className="text-xs text-gray-500">Version 1.0.0</p>
-                    <p className="text-xs text-gray-500">Network: Base Mainnet</p>
-                  </div>
+                  {/* Sign Out Button */}
+                  <button
+                    onClick={walletAuth.isAuthenticated ? walletAuth.signOut : cdpAuth.signOut}
+                    className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
+                  >
+                    Sign Out
+                  </button>
                 </div>
-              )}
+          )}
 
-              {/* Requests Tab */}
-              {activeTab === "requests" && (
+          {/* Requests Tab */}
+          {activeTab === "requests" && (
                 <>
                   <button
                     onClick={() => {
@@ -904,10 +894,32 @@ export default function Home() {
                   )}
                 </>
               )}
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-800/95 backdrop-blur-sm border-t border-gray-700 z-50">
+        <div className="flex justify-around items-center h-16 px-2">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveTab(item.id);
+                if (item.id === "requests") loadPaymentRequests();
+                if (item.id === "contacts") loadContacts();
+              }}
+              className={`flex flex-col items-center justify-center flex-1 py-2 transition-colors ${
+                activeTab === item.id
+                  ? "text-blue-500"
+                  : "text-gray-400"
+              }`}
+            >
+              {item.icon}
+              <span className="text-xs mt-1">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
     </main>
   );
 }
