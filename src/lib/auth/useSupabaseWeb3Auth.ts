@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAccount, useSignMessage } from "wagmi";
 import { SiweMessage } from "siwe";
 import { supabase } from "@/lib/supabase/client";
+import { PG_ERRORS, POSTGREST_ERRORS } from "@/lib/errors";
 import type { Session, User } from "@supabase/supabase-js";
 
 type AuthStatus = "signed_out" | "signing_in" | "signed_in";
@@ -48,13 +49,13 @@ export function useSupabaseWeb3Auth() {
 
       if (insertError) {
         // If duplicate wallet_address, update last_seen_at on existing profile
-        if (insertError.code === "23505") {
+        if (insertError.code === PG_ERRORS.UNIQUE_VIOLATION) {
           const { error: updateError } = await supabase
             .from("profiles")
             .update({ last_seen_at: new Date().toISOString() })
             .eq("id", userId);
           
-          if (updateError && updateError.code !== "PGRST116") {
+          if (updateError && updateError.code !== POSTGREST_ERRORS.NO_ROWS_RETURNED) {
             console.error("Error updating profile:", updateError);
           }
         } else {
