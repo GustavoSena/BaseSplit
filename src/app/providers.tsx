@@ -2,7 +2,7 @@
 
 import { ReactNode } from "react";
 import { CDPHooksProvider } from "@coinbase/cdp-hooks";
-import { CDPReactProvider } from "@coinbase/cdp-react";
+import { CDPReactProvider, type AuthMethod } from "@coinbase/cdp-react";
 import { createCDPEmbeddedWalletConnector } from "@coinbase/cdp-wagmi";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -11,13 +11,14 @@ import { base } from "wagmi/chains";
 import { coinbaseWallet } from "wagmi/connectors";
 
 const queryClient = new QueryClient();
-
 const cdpConfig = {
   projectId: process.env.NEXT_PUBLIC_CDP_PROJECT_ID || "",
   ethereum: {
     createOnLogin: "smart" as const,
   },
   appName: "BaseSplit",
+  authMethods: ["email","oauth:google","oauth:apple","oauth:x"],
+  showCoinbaseFooter:false
 };
 
 const cdpConnector = createCDPEmbeddedWalletConnector({
