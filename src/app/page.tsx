@@ -78,6 +78,13 @@ interface PaymentRequest {
   profiles?: { wallet_address: string };
 }
 
+/**
+ * Render the main BaseSplit application UI and orchestrate authentication, on‑chain balances, contacts, and payment request workflows.
+ *
+ * Handles user sign-in (wallet and CDP), reads USDC balances, provides tabbed views for Requests, Contacts, and Settings, and manages creating, listing, and paying payment requests with Supabase synchronization and optional paymaster‑sponsored transactions.
+ *
+ * @returns The React element for the Home page.
+ */
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   

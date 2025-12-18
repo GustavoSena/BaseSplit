@@ -25,6 +25,14 @@ export const viewport: Viewport = {
   themeColor: "#3b82f6",
 };
 
+/**
+ * Root layout component that defines the document HTML structure, global fonts, and app-level providers.
+ *
+ * Renders the top-level <html> and <body> elements, injects the base app ID meta and favicon/apple-touch-icon links, and wraps `children` with the application's Providers.
+ *
+ * @param children - The application UI to render inside the layout
+ * @returns The root HTML element tree containing head metadata and the app content wrapped by Providers
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
