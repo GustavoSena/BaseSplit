@@ -395,6 +395,17 @@ export default function Home() {
   const createPaymentRequest = async () => {
     if (!currentWalletAddress || !newPayerAddress || !newAmount) return;
     
+    // Validate amount
+    const amount = parseFloat(newAmount);
+    if (isNaN(amount) || amount < 0.01) {
+      setCreateError("Minimum amount is $0.01 USDC");
+      return;
+    }
+    if (amount > 10000) {
+      setCreateError("Maximum amount is $10,000 USDC");
+      return;
+    }
+    
     setIsCreating(true);
     setCreateError(null);
     
@@ -410,7 +421,7 @@ export default function Home() {
         throw new Error("Profile not found. Please sign in again.");
       }
       
-      const amountInMicroUnits = Math.floor(parseFloat(newAmount) * 1e6);
+      const amountInMicroUnits = Math.floor(amount * 1e6);
       
       const { error } = await supabase.from("payment_requests").insert({
         requester_id: profileData.id,
@@ -451,6 +462,20 @@ export default function Home() {
   };
 
   const cancelRequest = async (requestId: string, action: "reject" | "cancel") => {
+    // Client-side authorization check
+    const request = [...paymentRequests, ...sentRequests].find(r => r.id === requestId);
+    if (!request) {
+      setPaymentRequestsError("Request not found");
+      return;
+    }
+    
+    const walletLower = currentWalletAddress?.toLowerCase();
+    if (action === "reject" && request.payer_wallet_address !== walletLower) {
+      setPaymentRequestsError("You can only reject requests sent to you");
+      return;
+    }
+    // Note: "cancel" action authorization is enforced by RLS (requester must own the request)
+    
     const { error } = await supabase
       .from("payment_requests")
       .update({
