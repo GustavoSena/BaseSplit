@@ -238,6 +238,7 @@ export default function Home() {
     if (isAuthenticated && currentWalletAddress) {
       loadPaymentRequests();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, currentWalletAddress]);
 
   // Periodic refresh of payment requests (every 30 seconds)
@@ -249,6 +250,7 @@ export default function Home() {
     }, 30000);
     
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, currentWalletAddress]);
 
   const loadProfile = async () => {
@@ -378,7 +380,10 @@ export default function Home() {
           .eq("requester_id", profileData.id)
           .order("created_at", { ascending: false });
 
-        if (!sentError) {
+        if (sentError) {
+          console.error("Failed to load sent requests:", sentError.message);
+          // Optionally append to paymentRequestsError or use a separate state
+        } else {
           setSentRequests(sent || []);
         }
       }
@@ -446,7 +451,7 @@ export default function Home() {
   };
 
   const rejectPaymentRequest = async (requestId: string) => {
-    await supabase
+    const { error } = await supabase
       .from("payment_requests")
       .update({
         status: "cancelled",
@@ -454,17 +459,27 @@ export default function Home() {
       })
       .eq("id", requestId);
     
+    if (error) {
+      setPaymentRequestsError("Failed to reject request: " + error.message);
+      return;
+    }
+    
     await loadPaymentRequests();
   };
 
   const cancelPaymentRequest = async (requestId: string) => {
-    await supabase
+    const { error } = await supabase
       .from("payment_requests")
       .update({
         status: "cancelled",
         updated_at: new Date().toISOString(),
       })
       .eq("id", requestId);
+    
+    if (error) {
+      setPaymentRequestsError("Failed to cancel request: " + error.message);
+      return;
+    }
     
     await loadPaymentRequests();
   };
@@ -942,7 +957,7 @@ export default function Home() {
                   {(() => {
                     const pendingIncoming = paymentRequests.filter(pr => pr.status === "pending");
                     const pendingSent = sentRequests.filter(pr => pr.status === "pending");
-                    const currentWallet = (address || cdpAuth.walletAddress)?.toLowerCase();
+                    const currentWallet = currentWalletAddress?.toLowerCase();
                     
                     return (
                       <>
@@ -1041,10 +1056,19 @@ export default function Home() {
                             {(() => {
                               const completedIncoming = paymentRequests.filter(pr => pr.status !== "pending");
                               const completedSent = sentRequests.filter(pr => pr.status !== "pending");
-                              const allHistory = [
+                              const allHistoryRaw = [
                                 ...completedIncoming.map(pr => ({ ...pr, direction: "received" as const })),
                                 ...completedSent.map(pr => ({ ...pr, direction: "sent" as const })),
-                              ].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+                              ];
+                              // Deduplicate by id (in case user sent request to themselves)
+                              const seenIds = new Set<string>();
+                              const allHistory = allHistoryRaw
+                                .filter(pr => {
+                                  if (seenIds.has(pr.id)) return false;
+                                  seenIds.add(pr.id);
+                                  return true;
+                                })
+                                .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
                               if (allHistory.length === 0) {
                                 return <p className="text-gray-500 text-sm text-center">No history yet</p>;
