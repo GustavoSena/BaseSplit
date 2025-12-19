@@ -294,29 +294,13 @@ export default function Home() {
     if (!isAuthenticated || !currentWalletAddress) return;
     
     const interval = setInterval(() => {
-      loadPaymentRequests();
+      if (!isRefreshing) {
+        loadPaymentRequests();
+      }
     }, 30000);
     
     return () => clearInterval(interval);
-  }, [isAuthenticated, currentWalletAddress, loadPaymentRequests]);
-
-  const loadProfile = async () => {
-    if (!user) return;
-
-    setProfileError(null);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    if (error) {
-      setProfileError(error.message);
-      setProfile(null);
-    } else {
-      setProfile(data);
-    }
-  };
+  }, [isAuthenticated, currentWalletAddress, loadPaymentRequests, isRefreshing]);
 
   const loadContacts = async () => {
     if (!currentWalletAddress) return;
@@ -474,7 +458,10 @@ export default function Home() {
       setPaymentRequestsError("You can only reject requests sent to you");
       return;
     }
-    // Note: "cancel" action authorization is enforced by RLS (requester must own the request)
+    if (action === "cancel" && !sentRequests.some(r => r.id === requestId)) {
+      setPaymentRequestsError("You can only cancel requests you created");
+      return;
+    }
     
     const { error } = await supabase
       .from("payment_requests")
