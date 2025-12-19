@@ -215,6 +215,55 @@ export default function Home() {
   const isConfirmed = callsStatus?.status === "success";
   const txHash = callsStatus?.receipts?.[0]?.transactionHash;
 
+  const loadPaymentRequests = useCallback(async (showRefreshIndicator = false) => {
+    if (!currentWalletAddress) return;
+
+    if (showRefreshIndicator) setIsRefreshing(true);
+    setPaymentRequestsError(null);
+    
+    try {
+      // Load incoming requests (where current wallet is the payer)
+      const { data: incoming, error: incomingError } = await supabase
+        .from("payment_requests")
+        .select("*, profiles!requester_id(wallet_address)")
+        .eq("payer_wallet_address", currentWalletAddress.toLowerCase())
+        .order("created_at", { ascending: false });
+
+      if (incomingError) {
+        setPaymentRequestsError(incomingError.message);
+        setPaymentRequests([]);
+      } else {
+        setPaymentRequests(incoming || []);
+      }
+
+      // Load sent requests (where current wallet is the requester)
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("wallet_address", currentWalletAddress.toLowerCase())
+        .single();
+
+      if (profileData) {
+        const { data: sent, error: sentError } = await supabase
+          .from("payment_requests")
+          .select("*, profiles!requester_id(wallet_address)")
+          .eq("requester_id", profileData.id)
+          .order("created_at", { ascending: false });
+
+        if (sentError) {
+          setPaymentRequestsError(prev => 
+            prev ? `${prev}; Failed to load sent requests` : "Failed to load sent requests"
+          );
+          setSentRequests([]);
+        } else {
+          setSentRequests(sent || []);
+        }
+      }
+    } finally {
+      if (showRefreshIndicator) setIsRefreshing(false);
+    }
+  }, [currentWalletAddress]);
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -238,8 +287,7 @@ export default function Home() {
     if (isAuthenticated && currentWalletAddress) {
       loadPaymentRequests();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, currentWalletAddress]);
+  }, [isAuthenticated, currentWalletAddress, loadPaymentRequests]);
 
   // Periodic refresh of payment requests (every 30 seconds)
   useEffect(() => {
@@ -250,8 +298,7 @@ export default function Home() {
     }, 30000);
     
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, currentWalletAddress]);
+  }, [isAuthenticated, currentWalletAddress, loadPaymentRequests]);
 
   const loadProfile = async () => {
     if (!user) return;
@@ -345,53 +392,6 @@ export default function Home() {
     }
   };
 
-  const loadPaymentRequests = async (showRefreshIndicator = false) => {
-    if (!currentWalletAddress) return;
-
-    if (showRefreshIndicator) setIsRefreshing(true);
-    setPaymentRequestsError(null);
-    
-    try {
-      // Load incoming requests (where current wallet is the payer)
-      const { data: incoming, error: incomingError } = await supabase
-        .from("payment_requests")
-        .select("*, profiles!requester_id(wallet_address)")
-        .eq("payer_wallet_address", currentWalletAddress.toLowerCase())
-        .order("created_at", { ascending: false });
-
-      if (incomingError) {
-        setPaymentRequestsError(incomingError.message);
-        setPaymentRequests([]);
-      } else {
-        setPaymentRequests(incoming || []);
-      }
-
-      // Load sent requests (where current wallet is the requester)
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("wallet_address", currentWalletAddress.toLowerCase())
-        .single();
-
-      if (profileData) {
-        const { data: sent, error: sentError } = await supabase
-          .from("payment_requests")
-          .select("*, profiles!requester_id(wallet_address)")
-          .eq("requester_id", profileData.id)
-          .order("created_at", { ascending: false });
-
-        if (sentError) {
-          console.error("Failed to load sent requests:", sentError.message);
-          // Optionally append to paymentRequestsError or use a separate state
-        } else {
-          setSentRequests(sent || []);
-        }
-      }
-    } finally {
-      if (showRefreshIndicator) setIsRefreshing(false);
-    }
-  };
-
   const createPaymentRequest = async () => {
     if (!currentWalletAddress || !newPayerAddress || !newAmount) return;
     
@@ -450,7 +450,7 @@ export default function Home() {
     await loadPaymentRequests();
   };
 
-  const rejectPaymentRequest = async (requestId: string) => {
+  const cancelRequest = async (requestId: string, action: "reject" | "cancel") => {
     const { error } = await supabase
       .from("payment_requests")
       .update({
@@ -460,24 +460,7 @@ export default function Home() {
       .eq("id", requestId);
     
     if (error) {
-      setPaymentRequestsError("Failed to reject request: " + error.message);
-      return;
-    }
-    
-    await loadPaymentRequests();
-  };
-
-  const cancelPaymentRequest = async (requestId: string) => {
-    const { error } = await supabase
-      .from("payment_requests")
-      .update({
-        status: "cancelled",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", requestId);
-    
-    if (error) {
-      setPaymentRequestsError("Failed to cancel request: " + error.message);
+      setPaymentRequestsError(`Failed to ${action} request: ${error.message}`);
       return;
     }
     
@@ -991,7 +974,7 @@ export default function Home() {
                                          "Pay"}
                                       </button>
                                       <button
-                                        onClick={() => rejectPaymentRequest(pr.id)}
+                                        onClick={() => cancelRequest(pr.id, "reject")}
                                         className="py-1.5 px-3 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm font-medium rounded-lg transition-colors border border-red-600/30"
                                       >
                                         Reject
@@ -1019,7 +1002,7 @@ export default function Home() {
                                 </p>
                                 {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
                                 <button
-                                  onClick={() => cancelPaymentRequest(pr.id)}
+                                  onClick={() => cancelRequest(pr.id, "cancel")}
                                   className="mt-2 py-1.5 px-3 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-medium rounded-lg transition-colors"
                                 >
                                   Cancel Request
