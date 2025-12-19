@@ -21,8 +21,19 @@ import { useIsSignedIn } from "@coinbase/cdp-hooks";
 import { useSupabaseWeb3Auth } from "@/lib/auth/useSupabaseWeb3Auth";
 import { useCDPAuth } from "@/lib/auth/useCDPAuth";
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase/client";
 import { USDC_BASE_MAINNET } from "@/lib/constants";
+import {
+  Profile,
+  Contact,
+  PaymentRequest,
+  getProfileIdByWallet,
+  getContactsByOwnerId,
+  createContact,
+  getIncomingPaymentRequests,
+  getSentPaymentRequests,
+  createPaymentRequest as createPaymentRequestQuery,
+  updatePaymentRequestStatus as updatePaymentRequestStatusQuery,
+} from "@/lib/supabase/queries";
 
 const ERC20_ABI = [
   {
@@ -43,40 +54,6 @@ const ERC20_ABI = [
     outputs: [{ name: "", type: "uint256" }],
   },
 ] as const;
-
-interface Profile {
-  id: string;
-  wallet_address: string;
-  created_at: string;
-  last_seen_at: string;
-}
-
-interface Contact {
-  id: string;
-  owner_id: string;
-  contact_wallet_address: string;
-  label: string;
-  note: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface PaymentRequest {
-  id: string;
-  requester_id: string;
-  payer_wallet_address: string;
-  token_address: string;
-  chain_id: number;
-  amount: number;
-  memo: string | null;
-  status: "pending" | "paid" | "cancelled" | "expired";
-  tx_hash: string | null;
-  expires_at: string | null;
-  paid_at: string | null;
-  created_at: string;
-  updated_at: string;
-  profiles?: { wallet_address: string };
-}
 
 /**
  * Render the main BaseSplit application UI and orchestrate authentication, on‑chain balances, contacts, and payment request workflows.
@@ -182,6 +159,10 @@ export default function Home() {
   // Tab state
   const [activeTab, setActiveTab] = useState<"requests" | "contacts" | "settings">("requests");
   
+  // Tab refresh grace period (7 seconds per tab to prevent redundant reloads)
+  const [lastTabRefresh, setLastTabRefresh] = useState<Record<string, number>>({});
+  const TAB_REFRESH_GRACE_PERIOD = 7000; // 7 seconds
+  
   // Paymaster capabilities
   const { data: availableCapabilities } = useCapabilities({
     account: address,
@@ -223,41 +204,32 @@ export default function Home() {
     
     try {
       // Load incoming requests (where current wallet is the payer)
-      const { data: incoming, error: incomingError } = await supabase
-        .from("payment_requests")
-        .select("*, profiles!requester_id(wallet_address)")
-        .eq("payer_wallet_address", currentWalletAddress.toLowerCase())
-        .order("created_at", { ascending: false });
-
-      if (incomingError) {
-        setPaymentRequestsError(incomingError.message);
+      const incomingResult = await getIncomingPaymentRequests(currentWalletAddress);
+      if (incomingResult.error) {
+        setPaymentRequestsError(incomingResult.error);
         setPaymentRequests([]);
       } else {
-        setPaymentRequests(incoming || []);
+        setPaymentRequests(incomingResult.data || []);
       }
 
       // Load sent requests (where current wallet is the requester)
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("wallet_address", currentWalletAddress.toLowerCase())
-        .single();
-
-      if (profileData) {
-        const { data: sent, error: sentError } = await supabase
-          .from("payment_requests")
-          .select("*, profiles!requester_id(wallet_address)")
-          .eq("requester_id", profileData.id)
-          .order("created_at", { ascending: false });
-
-        if (sentError) {
+      const profileResult = await getProfileIdByWallet(currentWalletAddress);
+      if (profileResult.error) {
+        console.error("Failed to load profile:", profileResult.error);
+        setSentRequests([]);
+      } else if (profileResult.data) {
+        const sentResult = await getSentPaymentRequests(profileResult.data.id);
+        if (sentResult.error) {
           setPaymentRequestsError(prev => 
             prev ? `${prev}; Failed to load sent requests` : "Failed to load sent requests"
           );
           setSentRequests([]);
         } else {
-          setSentRequests(sent || []);
+          setSentRequests(sentResult.data || []);
         }
+      } else {
+        // No profile found (new user)
+        setSentRequests([]);
       }
     } finally {
       if (showRefreshIndicator) setIsRefreshing(false);
@@ -307,29 +279,18 @@ export default function Home() {
 
     setContactsError(null);
     try {
-      // Get profile ID by wallet
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("wallet_address", currentWalletAddress.toLowerCase())
-        .single();
-      
-      if (!profileData) {
+      const profileResult = await getProfileIdByWallet(currentWalletAddress);
+      if (!profileResult.data) {
         setContacts([]);
         return;
       }
       
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("*")
-        .eq("owner_id", profileData.id)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        setContactsError(error.message);
+      const contactsResult = await getContactsByOwnerId(profileResult.data.id);
+      if (contactsResult.error) {
+        setContactsError(contactsResult.error);
         setContacts([]);
       } else {
-        setContacts(data || []);
+        setContacts(contactsResult.data || []);
       }
     } catch (err) {
       setContactsError(err instanceof Error ? err.message : "Failed to load contacts");
@@ -344,24 +305,19 @@ export default function Home() {
     setAddContactError(null);
     
     try {
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("wallet_address", currentWalletAddress.toLowerCase())
-        .single();
-      
-      if (profileError || !profileData) {
+      const profileResult = await getProfileIdByWallet(currentWalletAddress);
+      if (!profileResult.data) {
         throw new Error("Profile not found. Please sign in again.");
       }
       
-      const { error } = await supabase.from("contacts").insert({
-        owner_id: profileData.id,
-        contact_wallet_address: newContactAddress.toLowerCase(),
+      const result = await createContact({
+        ownerId: profileResult.data.id,
+        contactWalletAddress: newContactAddress,
         label: newContactLabel,
         note: newContactNote || null,
       });
       
-      if (error) throw error;
+      if (result.error) throw new Error(result.error);
       
       // Reset form and reload
       setNewContactAddress("");
@@ -394,27 +350,21 @@ export default function Home() {
     setCreateError(null);
     
     try {
-      // Look up profile ID by wallet address
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("wallet_address", currentWalletAddress.toLowerCase())
-        .single();
-      
-      if (profileError || !profileData) {
+      const profileResult = await getProfileIdByWallet(currentWalletAddress);
+      if (!profileResult.data) {
         throw new Error("Profile not found. Please sign in again.");
       }
       
       const amountInMicroUnits = Math.floor(amount * 1e6);
       
-      const { error } = await supabase.from("payment_requests").insert({
-        requester_id: profileData.id,
-        payer_wallet_address: newPayerAddress.toLowerCase(),
+      const result = await createPaymentRequestQuery({
+        requesterId: profileResult.data.id,
+        payerWalletAddress: newPayerAddress,
         amount: amountInMicroUnits,
         memo: newMemo || null,
       });
       
-      if (error) throw error;
+      if (result.error) throw new Error(result.error);
       
       // Reset form and reload
       setNewPayerAddress("");
@@ -432,14 +382,11 @@ export default function Home() {
   };
 
   const updatePaymentRequestStatus = async (requestId: string, hash: string) => {
-    await supabase
-      .from("payment_requests")
-      .update({
-        status: "paid",
-        tx_hash: hash,
-        paid_at: new Date().toISOString(),
-      })
-      .eq("id", requestId);
+    await updatePaymentRequestStatusQuery({
+      requestId,
+      status: "paid",
+      txHash: hash,
+    });
     
     setPayingRequestId(null);
     await loadPaymentRequests();
@@ -463,16 +410,13 @@ export default function Home() {
       return;
     }
     
-    const { error } = await supabase
-      .from("payment_requests")
-      .update({
-        status: "cancelled",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", requestId);
+    const result = await updatePaymentRequestStatusQuery({
+      requestId,
+      status: "cancelled",
+    });
     
-    if (error) {
-      setPaymentRequestsError(`Failed to ${action} request: ${error.message}`);
+    if (result.error) {
+      setPaymentRequestsError(`Failed to ${action} request: ${result.error}`);
       return;
     }
     
@@ -615,8 +559,13 @@ export default function Home() {
                   key={item.id}
                   onClick={() => {
                     setActiveTab(item.id);
-                    if (item.id === "requests") loadPaymentRequests();
-                    if (item.id === "contacts") loadContacts();
+                    const now = Date.now();
+                    const lastRefresh = lastTabRefresh[item.id] || 0;
+                    if (now - lastRefresh > TAB_REFRESH_GRACE_PERIOD) {
+                      if (item.id === "requests") loadPaymentRequests();
+                      if (item.id === "contacts") loadContacts();
+                      setLastTabRefresh(prev => ({ ...prev, [item.id]: now }));
+                    }
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     activeTab === item.id
@@ -1063,7 +1012,12 @@ export default function Home() {
                                   seenIds.add(pr.id);
                                   return true;
                                 })
-                                .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+                                .sort((a, b) => {
+                                  // Use paid_at for paid requests, otherwise created_at for chronological ordering
+                                  const dateA = a.status === "paid" && a.paid_at ? a.paid_at : a.created_at;
+                                  const dateB = b.status === "paid" && b.paid_at ? b.paid_at : b.created_at;
+                                  return new Date(dateB).getTime() - new Date(dateA).getTime();
+                                });
 
                               if (allHistory.length === 0) {
                                 return <p className="text-gray-500 text-sm text-center">No history yet</p>;
@@ -1122,8 +1076,13 @@ export default function Home() {
               key={item.id}
               onClick={() => {
                 setActiveTab(item.id);
-                if (item.id === "requests") loadPaymentRequests();
-                if (item.id === "contacts") loadContacts();
+                const now = Date.now();
+                const lastRefresh = lastTabRefresh[item.id] || 0;
+                if (now - lastRefresh > TAB_REFRESH_GRACE_PERIOD) {
+                  if (item.id === "requests") loadPaymentRequests();
+                  if (item.id === "contacts") loadContacts();
+                  setLastTabRefresh(prev => ({ ...prev, [item.id]: now }));
+                }
               }}
               className={`flex flex-col items-center justify-center flex-1 py-2 transition-colors ${
                 activeTab === item.id
