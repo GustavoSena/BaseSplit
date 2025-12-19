@@ -153,7 +153,10 @@ export default function Home() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactsError, setContactsError] = useState<string | null>(null);
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
+  const [sentRequests, setSentRequests] = useState<PaymentRequest[]>([]);
   const [paymentRequestsError, setPaymentRequestsError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   
   // Payment request form state
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -229,6 +232,24 @@ export default function Home() {
       updatePaymentRequestStatus(payingRequestId, txHash);
     }
   }, [isConfirmed, txHash, payingRequestId]);
+
+  // Load payment requests on mount and when authenticated
+  useEffect(() => {
+    if (isAuthenticated && currentWalletAddress) {
+      loadPaymentRequests();
+    }
+  }, [isAuthenticated, currentWalletAddress]);
+
+  // Periodic refresh of payment requests (every 30 seconds)
+  useEffect(() => {
+    if (!isAuthenticated || !currentWalletAddress) return;
+    
+    const interval = setInterval(() => {
+      loadPaymentRequests();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [isAuthenticated, currentWalletAddress]);
 
   const loadProfile = async () => {
     if (!user) return;
@@ -322,22 +343,47 @@ export default function Home() {
     }
   };
 
-  const loadPaymentRequests = async () => {
+  const loadPaymentRequests = async (showRefreshIndicator = false) => {
     if (!currentWalletAddress) return;
 
+    if (showRefreshIndicator) setIsRefreshing(true);
     setPaymentRequestsError(null);
-    // Only load payment requests where current wallet is the payer (received requests)
-    const { data, error } = await supabase
-      .from("payment_requests")
-      .select("*, profiles!requester_id(wallet_address)")
-      .eq("payer_wallet_address", currentWalletAddress.toLowerCase())
-      .order("created_at", { ascending: false });
+    
+    try {
+      // Load incoming requests (where current wallet is the payer)
+      const { data: incoming, error: incomingError } = await supabase
+        .from("payment_requests")
+        .select("*, profiles!requester_id(wallet_address)")
+        .eq("payer_wallet_address", currentWalletAddress.toLowerCase())
+        .order("created_at", { ascending: false });
 
-    if (error) {
-      setPaymentRequestsError(error.message);
-      setPaymentRequests([]);
-    } else {
-      setPaymentRequests(data || []);
+      if (incomingError) {
+        setPaymentRequestsError(incomingError.message);
+        setPaymentRequests([]);
+      } else {
+        setPaymentRequests(incoming || []);
+      }
+
+      // Load sent requests (where current wallet is the requester)
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("wallet_address", currentWalletAddress.toLowerCase())
+        .single();
+
+      if (profileData) {
+        const { data: sent, error: sentError } = await supabase
+          .from("payment_requests")
+          .select("*, profiles!requester_id(wallet_address)")
+          .eq("requester_id", profileData.id)
+          .order("created_at", { ascending: false });
+
+        if (!sentError) {
+          setSentRequests(sent || []);
+        }
+      }
+    } finally {
+      if (showRefreshIndicator) setIsRefreshing(false);
     }
   };
 
@@ -396,6 +442,30 @@ export default function Home() {
       .eq("id", requestId);
     
     setPayingRequestId(null);
+    await loadPaymentRequests();
+  };
+
+  const rejectPaymentRequest = async (requestId: string) => {
+    await supabase
+      .from("payment_requests")
+      .update({
+        status: "cancelled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", requestId);
+    
+    await loadPaymentRequests();
+  };
+
+  const cancelPaymentRequest = async (requestId: string) => {
+    await supabase
+      .from("payment_requests")
+      .update({
+        status: "cancelled",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", requestId);
+    
     await loadPaymentRequests();
   };
 
@@ -730,22 +800,40 @@ export default function Home() {
           {/* Requests Tab */}
           {activeTab === "requests" && (
                 <>
-                  <button
-                    onClick={() => {
-                      const newState = !showCreateForm;
-                      setShowCreateForm(newState);
-                      if (newState) {
-                        loadContacts(); // Load contacts when opening form
-                      } else {
-                        setContactSearch("");
-                        setShowContactDropdown(false);
-                        setNewPayerAddress("");
-                      }
-                    }}
-                    className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
-                  >
-                    {showCreateForm ? "Cancel" : "Create Request"}
-                  </button>
+                  {/* Header with Create and Refresh */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const newState = !showCreateForm;
+                        setShowCreateForm(newState);
+                        if (newState) {
+                          loadContacts();
+                        } else {
+                          setContactSearch("");
+                          setShowContactDropdown(false);
+                          setNewPayerAddress("");
+                        }
+                      }}
+                      className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                    >
+                      {showCreateForm ? "Cancel" : "Create Request"}
+                    </button>
+                    <button
+                      onClick={() => loadPaymentRequests(true)}
+                      disabled={isRefreshing}
+                      className="p-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 text-gray-300 rounded-lg transition-colors"
+                      title="Refresh requests"
+                    >
+                      <svg 
+                        className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`} 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                  </div>
 
                   {/* Create Payment Request Form */}
                   {showCreateForm && (
@@ -850,55 +938,158 @@ export default function Home() {
                     <p className="text-red-400 text-sm text-center">{paymentRequestsError}</p>
                   )}
 
-                  {paymentRequests.length > 0 ? (
-                    <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-                      {paymentRequests.map((pr) => {
-                        const currentWallet = (address || cdpAuth.walletAddress)?.toLowerCase();
-                        const canPay = pr.status === "pending" && currentWallet === pr.payer_wallet_address;
-                        const isPaying = payingRequestId === pr.id;
-                        
-                        return (
-                          <div key={pr.id} className="text-white text-sm border-b border-gray-700 pb-3 last:border-0">
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
-                              <span className={`text-xs px-2 py-0.5 rounded ${
-                                pr.status === "paid" ? "bg-green-800 text-green-300" :
-                                pr.status === "pending" ? "bg-yellow-800 text-yellow-300" :
-                                "bg-gray-700 text-gray-300"
-                              }`}>{pr.status}</span>
-                            </div>
-                            <p className="text-gray-500 font-mono text-xs mt-1">
-                              From: {pr.profiles?.wallet_address?.slice(0, 6)}...{pr.profiles?.wallet_address?.slice(-4)}
-                            </p>
-                            {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
-                            {pr.tx_hash && (
-                              <a 
-                                href={`https://basescan.org/tx/${pr.tx_hash}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-400 text-xs hover:underline"
-                              >
-                                View transaction
-                              </a>
-                            )}
-                            {canPay && (
-                              <button
-                                onClick={() => payPaymentRequest(pr)}
-                                disabled={isPaying || isSending || isConfirming}
-                                className="mt-2 w-full py-1.5 px-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                              >
-                                {isPaying && isSending ? "Sending..." : 
-                                 isPaying && isConfirming ? "Confirming..." : 
-                                 "Pay Now"}
-                              </button>
-                            )}
+                  {/* Pending Incoming Requests */}
+                  {(() => {
+                    const pendingIncoming = paymentRequests.filter(pr => pr.status === "pending");
+                    const pendingSent = sentRequests.filter(pr => pr.status === "pending");
+                    const currentWallet = (address || cdpAuth.walletAddress)?.toLowerCase();
+                    
+                    return (
+                      <>
+                        {/* Pending Requests to Pay */}
+                        {pendingIncoming.length > 0 && (
+                          <div className="bg-gray-900 rounded-lg p-4 space-y-3">
+                            <p className="text-sm text-gray-400 font-medium">Requests to Pay</p>
+                            {pendingIncoming.map((pr) => {
+                              const canPay = currentWallet === pr.payer_wallet_address;
+                              const isPaying = payingRequestId === pr.id;
+                              
+                              return (
+                                <div key={pr.id} className="text-white text-sm border-b border-gray-700 pb-3 last:border-0">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
+                                    <span className="text-xs px-2 py-0.5 rounded bg-yellow-800 text-yellow-300">pending</span>
+                                  </div>
+                                  <p className="text-gray-500 font-mono text-xs mt-1">
+                                    From: {pr.profiles?.wallet_address?.slice(0, 6)}...{pr.profiles?.wallet_address?.slice(-4)}
+                                  </p>
+                                  {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
+                                  {canPay && (
+                                    <div className="mt-2 flex gap-2">
+                                      <button
+                                        onClick={() => payPaymentRequest(pr)}
+                                        disabled={isPaying || isSending || isConfirming}
+                                        className="flex-1 py-1.5 px-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                                      >
+                                        {isPaying && isSending ? "Sending..." : 
+                                         isPaying && isConfirming ? "Confirming..." : 
+                                         "Pay"}
+                                      </button>
+                                      <button
+                                        onClick={() => rejectPaymentRequest(pr.id)}
+                                        className="py-1.5 px-3 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm font-medium rounded-lg transition-colors border border-red-600/30"
+                                      >
+                                        Reject
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-sm text-center">No payment requests yet</p>
-                  )}
+                        )}
+
+                        {/* Pending Requests Sent */}
+                        {pendingSent.length > 0 && (
+                          <div className="bg-gray-900 rounded-lg p-4 space-y-3">
+                            <p className="text-sm text-gray-400 font-medium">Awaiting Payment</p>
+                            {pendingSent.map((pr) => (
+                              <div key={pr.id} className="text-white text-sm border-b border-gray-700 pb-3 last:border-0">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
+                                  <span className="text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-300">sent</span>
+                                </div>
+                                <p className="text-gray-500 font-mono text-xs mt-1">
+                                  To: {pr.payer_wallet_address?.slice(0, 6)}...{pr.payer_wallet_address?.slice(-4)}
+                                </p>
+                                {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
+                                <button
+                                  onClick={() => cancelPaymentRequest(pr.id)}
+                                  className="mt-2 py-1.5 px-3 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+                                >
+                                  Cancel Request
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {pendingIncoming.length === 0 && pendingSent.length === 0 && (
+                          <p className="text-gray-500 text-sm text-center py-4">No pending requests</p>
+                        )}
+
+                        {/* History Toggle */}
+                        <button
+                          onClick={() => setShowHistory(!showHistory)}
+                          className="w-full py-2 px-4 bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                        >
+                          <span>{showHistory ? "Hide History" : "Show History"}</span>
+                          <svg 
+                            className={`w-4 h-4 transition-transform ${showHistory ? "rotate-180" : ""}`} 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        {/* History Section */}
+                        {showHistory && (
+                          <div className="bg-gray-900 rounded-lg p-4 space-y-3">
+                            <p className="text-sm text-gray-400 font-medium">History</p>
+                            {(() => {
+                              const completedIncoming = paymentRequests.filter(pr => pr.status !== "pending");
+                              const completedSent = sentRequests.filter(pr => pr.status !== "pending");
+                              const allHistory = [
+                                ...completedIncoming.map(pr => ({ ...pr, direction: "received" as const })),
+                                ...completedSent.map(pr => ({ ...pr, direction: "sent" as const })),
+                              ].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+                              if (allHistory.length === 0) {
+                                return <p className="text-gray-500 text-sm text-center">No history yet</p>;
+                              }
+
+                              return allHistory.map((pr) => (
+                                <div key={pr.id} className="text-white text-sm border-b border-gray-700 pb-3 last:border-0">
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-xs ${pr.direction === "sent" ? "text-blue-400" : "text-purple-400"}`}>
+                                        {pr.direction === "sent" ? "↑ Sent" : "↓ Received"}
+                                      </span>
+                                      <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
+                                    </div>
+                                    <span className={`text-xs px-2 py-0.5 rounded ${
+                                      pr.status === "paid" ? "bg-green-800 text-green-300" :
+                                      pr.status === "cancelled" ? "bg-red-800 text-red-300" :
+                                      "bg-gray-700 text-gray-300"
+                                    }`}>{pr.status}</span>
+                                  </div>
+                                  <p className="text-gray-500 font-mono text-xs mt-1">
+                                    {pr.direction === "sent" 
+                                      ? `To: ${pr.payer_wallet_address?.slice(0, 6)}...${pr.payer_wallet_address?.slice(-4)}`
+                                      : `From: ${pr.profiles?.wallet_address?.slice(0, 6)}...${pr.profiles?.wallet_address?.slice(-4)}`
+                                    }
+                                  </p>
+                                  {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
+                                  {pr.tx_hash && (
+                                    <a 
+                                      href={`https://basescan.org/tx/${pr.tx_hash}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-400 text-xs hover:underline"
+                                    >
+                                      View transaction
+                                    </a>
+                                  )}
+                                </div>
+                              ));
+                            })()}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </>
               )}
         </div>
