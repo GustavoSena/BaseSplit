@@ -22,11 +22,13 @@ const defaultProps: SVGProps<SVGSVGElement> = {
 };
 
 export function Icon({ size = "md", className = "", ...props }: IconProps) {
+  // Destructure className from props to prevent it from overriding our computed className
+  const { className: _propsClassName, ...restProps } = props as { className?: string };
   return (
     <svg
       {...defaultProps}
-      className={`${sizeClasses[size]} ${className}`}
-      {...props}
+      {...restProps}
+      className={`${sizeClasses[size]} ${className}`.trim()}
     />
   );
 }

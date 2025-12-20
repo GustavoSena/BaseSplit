@@ -354,7 +354,11 @@ export function RequestsTab({
                   <span className="badge-pending">pending</span>
                 </div>
                 <p className="text-gray-500 text-xs mt-1 flex items-center gap-1">
-                  From: <Name address={pr.profiles?.wallet_address as `0x${string}`} chain={base} className="font-mono" />
+                  From: {pr.profiles?.wallet_address ? (
+                    <Name address={pr.profiles.wallet_address as `0x${string}`} chain={base} className="font-mono" />
+                  ) : (
+                    <span className="font-mono">Unknown</span>
+                  )}
                 </p>
                 {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
                 {canPay && (
@@ -393,7 +397,11 @@ export function RequestsTab({
                 <span className="badge-sent">sent</span>
               </div>
               <p className="text-gray-500 text-xs mt-1 flex items-center gap-1">
-                To: <Name address={pr.payer_wallet_address as `0x${string}`} chain={base} className="font-mono" />
+                To: {pr.payer_wallet_address ? (
+                  <Name address={pr.payer_wallet_address as `0x${string}`} chain={base} className="font-mono" />
+                ) : (
+                  <span className="font-mono">Unknown</span>
+                )}
               </p>
               {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
               <button
@@ -466,8 +474,8 @@ export function RequestsTab({
                 </div>
                 <p className="text-gray-500 font-mono text-xs mt-1">
                   {pr.direction === "sent" 
-                    ? `To: ${pr.payer_wallet_address?.slice(0, 6)}...${pr.payer_wallet_address?.slice(-4)}`
-                    : `From: ${pr.profiles?.wallet_address?.slice(0, 6)}...${pr.profiles?.wallet_address?.slice(-4)}`
+                    ? `To: ${pr.payer_wallet_address ? `${pr.payer_wallet_address.slice(0, 6)}...${pr.payer_wallet_address.slice(-4)}` : "Unknown"}`
+                    : `From: ${pr.profiles?.wallet_address ? `${pr.profiles.wallet_address.slice(0, 6)}...${pr.profiles.wallet_address.slice(-4)}` : "Unknown"}`
                   }
                 </p>
                 {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
