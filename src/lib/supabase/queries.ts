@@ -162,6 +162,16 @@ export async function createPaymentRequest(params: {
   return { data, error: null };
 }
 
+/**
+ * Update a payment request's status and persist timestamps and transaction hash when applicable.
+ *
+ * When `status` is `"paid"` and `txHash` is provided, the request's `tx_hash` and `paid_at` are set; `updated_at` is always updated.
+ *
+ * @param params.requestId - The payment request ID to update
+ * @param params.status - The new status: `"paid"`, `"cancelled"`, or `"rejected"`
+ * @param params.txHash - Optional transaction hash to record when marking the request as paid
+ * @returns The updated payment request record on success, `null` on error (see `error`/`errorCode`)
+ */
 export async function updatePaymentRequestStatus(params: {
   requestId: string;
   status: "paid" | "cancelled" | "rejected";
