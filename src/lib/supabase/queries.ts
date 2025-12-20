@@ -26,7 +26,7 @@ export interface PaymentRequest {
   chain_id: number;
   amount: number;
   memo: string | null;
-  status: "pending" | "paid" | "cancelled" | "expired";
+  status: "pending" | "paid" | "cancelled" | "rejected" | "expired";
   tx_hash: string | null;
   expires_at: string | null;
   paid_at: string | null;
@@ -164,7 +164,7 @@ export async function createPaymentRequest(params: {
 
 export async function updatePaymentRequestStatus(params: {
   requestId: string;
-  status: "paid" | "cancelled";
+  status: "paid" | "cancelled" | "rejected";
   txHash?: string;
 }): Promise<QueryResult<PaymentRequest>> {
   const updateData: Record<string, unknown> = {
