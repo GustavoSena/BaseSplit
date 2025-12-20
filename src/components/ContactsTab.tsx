@@ -95,43 +95,43 @@ export function ContactsTab({ currentWalletAddress }: ContactsTabProps) {
     <>
       <button
         onClick={() => setShowAddContactForm(!showAddContactForm)}
-        className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
+        className="w-full btn-secondary"
       >
         {showAddContactForm ? "Cancel" : "Add Contact"}
       </button>
 
       {/* Add Contact Form */}
       {showAddContactForm && (
-        <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-          <p className="text-sm text-gray-400 font-medium">Add New Contact</p>
+        <div className="card">
+          <p className="card-title">Add New Contact</p>
           <input
             type="text"
             placeholder="Contact label (e.g., Alice)"
             value={newContactLabel}
             onChange={(e) => setNewContactLabel(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            className="input"
           />
           <input
             type="text"
             placeholder="Wallet address (0x...)"
             value={newContactAddress}
             onChange={(e) => setNewContactAddress(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            className="input"
           />
           <input
             type="text"
             placeholder="Note (optional)"
             value={newContactNote}
             onChange={(e) => setNewContactNote(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            className="input"
           />
           {addContactError && (
-            <p className="text-red-400 text-xs">{addContactError}</p>
+            <p className="text-error">{addContactError}</p>
           )}
           <button
             onClick={addContact}
             disabled={isAddingContact || !newContactAddress || !newContactLabel}
-            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+            className="w-full btn-primary"
           >
             {isAddingContact ? "Adding..." : "Add Contact"}
           </button>
@@ -139,15 +139,15 @@ export function ContactsTab({ currentWalletAddress }: ContactsTabProps) {
       )}
 
       {contactsError && (
-        <p className="text-red-400 text-sm text-center">{contactsError}</p>
+        <p className="text-error-center">{contactsError}</p>
       )}
 
       {contacts.length > 0 ? (
-        <div className="bg-gray-900 rounded-lg p-4 space-y-2">
+        <div className="card space-y-2">
           {contacts.map((c) => (
-            <div key={c.id} className="text-white text-sm border-b border-gray-700 pb-2 last:border-0">
+            <div key={c.id} className="list-item-compact">
               <span className="font-medium">{c.label}</span>
-              <span className="text-gray-500 font-mono text-xs ml-2">
+              <span className="wallet-address-xs ml-2">
                 {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
               </span>
               {c.note && <p className="text-gray-400 text-xs mt-1">{c.note}</p>}
@@ -155,7 +155,7 @@ export function ContactsTab({ currentWalletAddress }: ContactsTabProps) {
           ))}
         </div>
       ) : (
-        <p className="text-gray-500 text-sm text-center">No contacts yet</p>
+        <p className="text-muted">No contacts yet</p>
       )}
     </>
   );

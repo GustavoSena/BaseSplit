@@ -3,8 +3,8 @@
 import { useAccount } from "wagmi";
 import { useCapabilities, useWriteContracts, useCallsStatus } from "wagmi/experimental";
 import { useMemo } from "react";
-
 import { useIsSignedIn } from "@coinbase/cdp-hooks";
+import { ClipboardIcon } from "@/components/Icons";
 import { useSupabaseWeb3Auth } from "@/lib/auth/useSupabaseWeb3Auth";
 import { useCDPAuth } from "@/lib/auth/useCDPAuth";
 import { useState, useEffect, useCallback } from "react";
@@ -191,16 +191,16 @@ export default function Home() {
 
   // Authenticated - show app
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black flex flex-col">
+    <main className="main-container">
       <DesktopHeader activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto pb-20 md:pb-8">
-        <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+      <div className="content-area">
+        <div className="content-wrapper">
           {/* Balance Card */}
-          <div className="bg-gray-800 rounded-2xl p-6 text-center">
+          <div className="balance-card">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <p className="text-gray-400 font-mono text-sm">
+              <p className="wallet-address">
                 {currentWalletAddress?.slice(0, 6)}...{currentWalletAddress?.slice(-4)}
               </p>
               <button
@@ -210,9 +210,7 @@ export default function Home() {
                 className="p-1 hover:bg-gray-700 rounded transition-colors"
                 title="Copy address"
               >
-                <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
+                <ClipboardIcon className="text-gray-500" />
               </button>
             </div>
             <p className="text-4xl font-bold text-white">${formattedBalance}</p>
