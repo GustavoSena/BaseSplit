@@ -382,11 +382,16 @@ export default function Home() {
   };
 
   const updatePaymentRequestStatus = async (requestId: string, hash: string) => {
-    await updatePaymentRequestStatusQuery({
+    const result = await updatePaymentRequestStatusQuery({
       requestId,
       status: "paid",
       txHash: hash,
     });
+    
+    if (result.error) {
+      console.error("Failed to update payment status:", result.error);
+      setPaymentRequestsError(`Payment sent but failed to update status: ${result.error}. TX: ${hash}`);
+    }
     
     setPayingRequestId(null);
     await loadPaymentRequests();
@@ -412,7 +417,7 @@ export default function Home() {
     
     const result = await updatePaymentRequestStatusQuery({
       requestId,
-      status: "cancelled",
+      status: action === "reject" ? "rejected" : "cancelled",
     });
     
     if (result.error) {
@@ -804,17 +809,23 @@ export default function Home() {
                         <input
                           type="text"
                           placeholder="Search contacts or enter wallet address..."
-                          value={contactSearch || newPayerAddress}
+                          value={contactSearch}
                           onChange={(e) => {
                             const value = e.target.value;
                             setContactSearch(value);
-                            if (value.startsWith("0x")) {
+                            // If user clears the field, also clear the payer address
+                            if (value === "") {
+                              setNewPayerAddress("");
+                              setShowContactDropdown(contacts.length > 0);
+                            } else if (value.startsWith("0x")) {
                               setNewPayerAddress(value);
+                              setShowContactDropdown(false);
+                            } else {
+                              setShowContactDropdown(contacts.length > 0);
                             }
-                            setShowContactDropdown(value.length > 0 && !value.startsWith("0x"));
                           }}
                           onFocus={() => {
-                            if (contacts.length > 0 && !newPayerAddress.startsWith("0x")) {
+                            if (contacts.length > 0 && !contactSearch.startsWith("0x")) {
                               setShowContactDropdown(true);
                             }
                           }}
@@ -1034,6 +1045,7 @@ export default function Home() {
                                     </div>
                                     <span className={`text-xs px-2 py-0.5 rounded ${
                                       pr.status === "paid" ? "bg-green-800 text-green-300" :
+                                      pr.status === "rejected" ? "bg-orange-800 text-orange-300" :
                                       pr.status === "cancelled" ? "bg-red-800 text-red-300" :
                                       "bg-gray-700 text-gray-300"
                                     }`}>{pr.status}</span>
