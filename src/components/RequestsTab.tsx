@@ -267,15 +267,15 @@ export function RequestsTab({
               className="input"
             />
             
-            {showContactDropdown && contacts.length > 0 && (
-              <div className="dropdown">
-                {contacts
-                  .filter(c => 
-                    contactSearch === "" ||
-                    c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
-                    c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
-                  )
-                  .map((c) => (
+            {showContactDropdown && contacts.length > 0 && (() => {
+              const filteredContacts = contacts.filter(c => 
+                contactSearch === "" ||
+                c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
+                c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
+              );
+              return (
+                <div className="dropdown">
+                  {filteredContacts.map((c) => (
                     <button
                       key={c.id}
                       type="button"
@@ -292,15 +292,12 @@ export function RequestsTab({
                       </span>
                     </button>
                   ))}
-                {contacts.filter(c => 
-                  contactSearch === "" ||
-                  c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
-                  c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
-                ).length === 0 && (
-                  <p className="px-3 py-2 text-gray-500 text-sm">No matching contacts</p>
-                )}
-              </div>
-            )}
+                  {filteredContacts.length === 0 && (
+                    <p className="px-3 py-2 text-gray-500 text-sm">No matching contacts</p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
           
           {newPayerAddress && (

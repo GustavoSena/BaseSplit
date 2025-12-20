@@ -16,7 +16,7 @@ const ERC20_ABI = [
 interface UseUSDCBalanceResult {
   balance: bigint | undefined;
   formattedBalance: string;
-  refetch: () => void;
+  refetch: () => Promise<unknown>;
 }
 
 export function useUSDCBalance(address: string | null | undefined): UseUSDCBalanceResult {

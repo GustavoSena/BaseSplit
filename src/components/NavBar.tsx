@@ -32,7 +32,9 @@ export function DesktopHeader({ activeTab, onTabChange }: NavBarProps) {
             {navItems.map((item) => (
               <button
                 key={item.id}
+                type="button"
                 onClick={() => onTabChange(item.id)}
+                aria-current={activeTab === item.id ? "page" : undefined}
                 className={activeTab === item.id ? "btn-nav-active" : "btn-nav-inactive"}
               >
                 {item.label}
@@ -52,7 +54,9 @@ export function MobileNav({ activeTab, onTabChange }: NavBarProps) {
         {navItems.map((item) => (
           <button
             key={item.id}
+            type="button"
             onClick={() => onTabChange(item.id)}
+            aria-current={activeTab === item.id ? "page" : undefined}
             className={`flex flex-col items-center justify-center flex-1 py-2 transition-colors ${
               activeTab === item.id ? "text-blue-500" : "text-gray-400"
             }`}

@@ -111,6 +111,20 @@ export default function Home() {
   const isConfirmed = callsStatus?.status === "success";
   const txHash = callsStatus?.receipts?.[0]?.transactionHash;
 
+  const updatePaymentRequestStatus = useCallback(async (requestId: string, hash: string) => {
+    const result = await updatePaymentRequestStatusQuery({
+      requestId,
+      status: "paid",
+      txHash: hash,
+    });
+    
+    if (result.error) {
+      console.error("Failed to update payment status:", result.error);
+    }
+    
+    setPayingRequestId(null);
+  }, []);
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -127,21 +141,18 @@ export default function Home() {
     if (isConfirmed && txHash && payingRequestId) {
       updatePaymentRequestStatus(payingRequestId, txHash);
     }
-  }, [isConfirmed, txHash, payingRequestId]);
+  }, [isConfirmed, txHash, payingRequestId, updatePaymentRequestStatus]);
 
-  const updatePaymentRequestStatus = async (requestId: string, hash: string) => {
-    const result = await updatePaymentRequestStatusQuery({
-      requestId,
-      status: "paid",
-      txHash: hash,
-    });
-    
-    if (result.error) {
-      console.error("Failed to update payment status:", result.error);
+  // Handle tab change with refresh logic - must be before early returns
+  const handleTabChange = useCallback((tabId: TabId) => {
+    setActiveTab(tabId);
+    const now = Date.now();
+    const lastRefresh = lastTabRefresh[tabId] || 0;
+    if (now - lastRefresh > TAB_REFRESH_GRACE_PERIOD) {
+      if (tabId === "contacts") loadContacts();
+      setLastTabRefresh(prev => ({ ...prev, [tabId]: now }));
     }
-    
-    setPayingRequestId(null);
-  };
+  }, [lastTabRefresh, loadContacts]);
 
   const payPaymentRequest = useCallback((request: PaymentRequest) => {
     if (!address) return;
@@ -172,17 +183,6 @@ export default function Home() {
   if (!mounted) {
     return <LoadingScreen />;
   }
-
-  // Handle tab change with refresh logic
-  const handleTabChange = useCallback((tabId: TabId) => {
-    setActiveTab(tabId);
-    const now = Date.now();
-    const lastRefresh = lastTabRefresh[tabId] || 0;
-    if (now - lastRefresh > TAB_REFRESH_GRACE_PERIOD) {
-      if (tabId === "contacts") loadContacts();
-      setLastTabRefresh(prev => ({ ...prev, [tabId]: now }));
-    }
-  }, [lastTabRefresh, loadContacts]);
 
   // Not authenticated - show login screen
   if (!isAuthenticated) {
