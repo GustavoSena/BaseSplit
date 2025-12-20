@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { base } from "viem/chains";
 import { Name } from "@coinbase/onchainkit/identity";
+import { RefreshIcon, ChevronDownIcon } from "./Icons";
 import {
   Contact,
   PaymentRequest,
@@ -221,31 +222,24 @@ export function RequestsTab({
               setNewPayerAddress("");
             }
           }}
-          className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+          className="flex-1 btn-success"
         >
           {showCreateForm ? "Cancel" : "Create Request"}
         </button>
         <button
           onClick={() => loadPaymentRequests(true)}
           disabled={isRefreshing}
-          className="p-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 text-gray-300 rounded-lg transition-colors"
+          className="btn-icon"
           title="Refresh requests"
         >
-          <svg 
-            className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`} 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          <RefreshIcon className={isRefreshing ? "animate-spin" : ""} />
         </button>
       </div>
 
       {/* Create Payment Request Form */}
       {showCreateForm && (
-        <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-          <p className="text-sm text-gray-400 font-medium">New Payment Request</p>
+        <div className="card">
+          <p className="card-title">New Payment Request</p>
           
           <div className="relative">
             <input
@@ -270,11 +264,11 @@ export function RequestsTab({
                   setShowContactDropdown(true);
                 }
               }}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="input"
             />
             
             {showContactDropdown && contacts.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+              <div className="dropdown">
                 {contacts
                   .filter(c => 
                     contactSearch === "" ||
@@ -290,7 +284,7 @@ export function RequestsTab({
                         setContactSearch(c.label);
                         setShowContactDropdown(false);
                       }}
-                      className="w-full px-3 py-2 text-left hover:bg-gray-700 text-white text-sm flex justify-between items-center"
+                      className="dropdown-item flex justify-between items-center"
                     >
                       <span className="font-medium">{c.label}</span>
                       <span className="text-gray-500 text-xs font-mono truncate ml-2">
@@ -322,22 +316,22 @@ export function RequestsTab({
             onChange={(e) => setNewAmount(e.target.value)}
             step="0.01"
             min="0"
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            className="input"
           />
           <input
             type="text"
             placeholder="Memo (optional)"
             value={newMemo}
             onChange={(e) => setNewMemo(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            className="input"
           />
           {createError && (
-            <p className="text-red-400 text-xs">{createError}</p>
+            <p className="text-error">{createError}</p>
           )}
           <button
             onClick={createPaymentRequest}
             disabled={isCreating || !newPayerAddress || !newAmount}
-            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+            className="w-full btn-primary"
           >
             {isCreating ? "Creating..." : "Create Request"}
           </button>
@@ -345,22 +339,22 @@ export function RequestsTab({
       )}
 
       {paymentRequestsError && (
-        <p className="text-red-400 text-sm text-center">{paymentRequestsError}</p>
+        <p className="text-error-center">{paymentRequestsError}</p>
       )}
 
       {/* Pending Requests to Pay */}
       {pendingIncoming.length > 0 && (
-        <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-          <p className="text-sm text-gray-400 font-medium">Requests to Pay</p>
+        <div className="card">
+          <p className="card-title">Requests to Pay</p>
           {pendingIncoming.map((pr) => {
             const canPay = currentWallet === pr.payer_wallet_address;
             const isPaying = payingRequestId === pr.id;
             
             return (
-              <div key={pr.id} className="text-white text-sm border-b border-gray-700 pb-3 last:border-0">
+              <div key={pr.id} className="list-item">
                 <div className="flex justify-between items-center">
                   <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-yellow-800 text-yellow-300">pending</span>
+                  <span className="badge-pending">pending</span>
                 </div>
                 <p className="text-gray-500 text-xs mt-1 flex items-center gap-1">
                   From: <Name address={pr.profiles?.wallet_address as `0x${string}`} chain={base} className="font-mono" />
@@ -371,7 +365,7 @@ export function RequestsTab({
                     <button
                       onClick={() => payPaymentRequest(pr)}
                       disabled={isPaying || isSending || isConfirming}
-                      className="flex-1 py-1.5 px-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                      className="flex-1 btn-success-sm"
                     >
                       {isPaying && isSending ? "Sending..." : 
                        isPaying && isConfirming ? "Confirming..." : 
@@ -379,7 +373,7 @@ export function RequestsTab({
                     </button>
                     <button
                       onClick={() => cancelRequest(pr.id, "reject")}
-                      className="py-1.5 px-3 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-sm font-medium rounded-lg transition-colors border border-red-600/30"
+                      className="btn-danger"
                     >
                       Reject
                     </button>
@@ -393,13 +387,13 @@ export function RequestsTab({
 
       {/* Pending Requests Sent */}
       {pendingSent.length > 0 && (
-        <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-          <p className="text-sm text-gray-400 font-medium">Awaiting Payment</p>
+        <div className="card">
+          <p className="card-title">Awaiting Payment</p>
           {pendingSent.map((pr) => (
-            <div key={pr.id} className="text-white text-sm border-b border-gray-700 pb-3 last:border-0">
+            <div key={pr.id} className="list-item">
               <div className="flex justify-between items-center">
                 <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
-                <span className="text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-300">sent</span>
+                <span className="badge-sent">sent</span>
               </div>
               <p className="text-gray-500 text-xs mt-1 flex items-center gap-1">
                 To: <Name address={pr.payer_wallet_address as `0x${string}`} chain={base} className="font-mono" />
@@ -407,7 +401,7 @@ export function RequestsTab({
               {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
               <button
                 onClick={() => cancelRequest(pr.id, "cancel")}
-                className="mt-2 py-1.5 px-3 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-medium rounded-lg transition-colors"
+                className="mt-2 btn-ghost"
               >
                 Cancel Request
               </button>
@@ -417,7 +411,7 @@ export function RequestsTab({
       )}
 
       {pendingIncoming.length === 0 && pendingSent.length === 0 && (
-        <p className="text-gray-500 text-sm text-center py-4">No pending requests</p>
+        <p className="text-muted py-4">No pending requests</p>
       )}
 
       {/* History Toggle */}
@@ -426,20 +420,13 @@ export function RequestsTab({
         className="w-full py-2 px-4 bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
       >
         <span>{showHistory ? "Hide History" : "Show History"}</span>
-        <svg 
-          className={`w-4 h-4 transition-transform ${showHistory ? "rotate-180" : ""}`} 
-          fill="none" 
-          viewBox="0 0 24 24" 
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <ChevronDownIcon className={`transition-transform ${showHistory ? "rotate-180" : ""}`} />
       </button>
 
       {/* History Section */}
       {showHistory && (
-        <div className="bg-gray-900 rounded-lg p-4 space-y-3">
-          <p className="text-sm text-gray-400 font-medium">History</p>
+        <div className="card">
+          <p className="card-title">History</p>
           {(() => {
             const completedIncoming = paymentRequests.filter(pr => pr.status !== "pending");
             const completedSent = sentRequests.filter(pr => pr.status !== "pending");
@@ -461,11 +448,11 @@ export function RequestsTab({
               });
 
             if (allHistory.length === 0) {
-              return <p className="text-gray-500 text-sm text-center">No history yet</p>;
+              return <p className="text-muted">No history yet</p>;
             }
 
             return allHistory.map((pr) => (
-              <div key={pr.id} className="text-white text-sm border-b border-gray-700 pb-3 last:border-0">
+              <div key={pr.id} className="list-item">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <span className={`text-xs ${pr.direction === "sent" ? "text-blue-400" : "text-purple-400"}`}>

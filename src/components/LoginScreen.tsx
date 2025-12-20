@@ -68,14 +68,14 @@ export function LoginScreen({ isConnected, walletAuth, authError }: LoginScreenP
             <button
               onClick={walletAuth.signIn}
               disabled={walletAuth.status === "signing_in"}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+              className="w-full btn-primary py-3"
             >
               {walletAuth.status === "signing_in" ? "Signing in..." : "Continue"}
             </button>
           )}
 
           {authError && (
-            <p className="text-red-400 text-sm text-center">{authError}</p>
+            <p className="text-error-center">{authError}</p>
           )}
         </div>
       </div>

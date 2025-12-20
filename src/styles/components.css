@@ -1,45 +1,35 @@
 /* Component Styles for BaseSplit */
-/* stylelint-disable at-rule-no-unknown */
 
 @layer components {
   /* ==================== BUTTONS ==================== */
   
-  /* Base button styles */
-  .btn {
-    @apply py-2 px-4 font-semibold rounded-lg transition-colors;
-  }
-  
-  .btn-sm {
-    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-colors;
-  }
-  
   /* Primary button (blue) */
   .btn-primary {
-    @apply btn bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
+    @apply py-2 px-4 font-semibold rounded-lg transition-colors bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
   }
   
   /* Secondary button (purple) */
   .btn-secondary {
-    @apply btn bg-purple-600 hover:bg-purple-700 text-white;
+    @apply py-2 px-4 font-semibold rounded-lg transition-colors bg-purple-600 hover:bg-purple-700 text-white;
   }
   
   /* Success button (green) */
   .btn-success {
-    @apply btn bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
+    @apply py-2 px-4 font-semibold rounded-lg transition-colors bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
   }
   
   .btn-success-sm {
-    @apply btn-sm bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
+    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-colors bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
   }
   
   /* Danger button (red) */
   .btn-danger {
-    @apply btn-sm bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/30;
+    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-colors bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/30;
   }
   
   /* Ghost button (gray) */
   .btn-ghost {
-    @apply btn-sm bg-gray-700 hover:bg-gray-600 text-gray-300;
+    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-colors bg-gray-700 hover:bg-gray-600 text-gray-300;
   }
   
   /* Icon button */
@@ -47,17 +37,13 @@
     @apply p-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 text-gray-300 rounded-lg transition-colors;
   }
   
-  /* Nav button */
-  .btn-nav {
-    @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors;
-  }
-  
+  /* Nav buttons */
   .btn-nav-active {
-    @apply btn-nav bg-blue-600 text-white;
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-600 text-white;
   }
   
   .btn-nav-inactive {
-    @apply btn-nav text-gray-400 hover:text-white hover:bg-gray-700;
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-700;
   }
 
   /* ==================== INPUTS ==================== */
@@ -76,35 +62,30 @@
     @apply text-sm text-gray-400 font-medium;
   }
   
-  /* Balance card */
   .balance-card {
     @apply bg-gray-800 rounded-2xl p-6 text-center;
   }
 
   /* ==================== STATUS BADGES ==================== */
   
-  .badge {
-    @apply text-xs px-2 py-0.5 rounded;
-  }
-  
   .badge-pending {
-    @apply badge bg-yellow-800 text-yellow-300;
+    @apply text-xs px-2 py-0.5 rounded bg-yellow-800 text-yellow-300;
   }
   
   .badge-sent {
-    @apply badge bg-blue-800 text-blue-300;
+    @apply text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-300;
   }
   
   .badge-paid {
-    @apply badge bg-green-800 text-green-300;
+    @apply text-xs px-2 py-0.5 rounded bg-green-800 text-green-300;
   }
   
   .badge-rejected {
-    @apply badge bg-orange-800 text-orange-300;
+    @apply text-xs px-2 py-0.5 rounded bg-orange-800 text-orange-300;
   }
   
   .badge-cancelled {
-    @apply badge bg-gray-700 text-gray-400;
+    @apply text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400;
   }
 
   /* ==================== LIST ITEMS ==================== */
@@ -170,10 +151,10 @@
   /* ==================== DROPDOWN ==================== */
   
   .dropdown {
-    @apply absolute z-10 top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg max-h-40 overflow-auto;
+    @apply absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto;
   }
   
   .dropdown-item {
-    @apply p-2 hover:bg-gray-700 cursor-pointer;
+    @apply w-full px-3 py-2 text-left hover:bg-gray-700 text-white text-sm;
   }
 }

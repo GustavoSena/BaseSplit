@@ -99,7 +99,7 @@ export function SettingsTab({
       {/* Sign Out Button */}
       <button
         onClick={walletAuth.isAuthenticated ? walletAuth.signOut : cdpAuth.signOut}
-        className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
+        className="w-full py-3 btn-danger text-base"
       >
         Sign Out
       </button>
