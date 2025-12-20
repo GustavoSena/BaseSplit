@@ -89,7 +89,7 @@ exception when duplicate_object then null; end $$;
 -- PAYMENT REQUESTS
 -- =========================
 do $$ begin
-  create type public.payment_request_status as enum ('pending', 'paid', 'cancelled', 'expired');
+  create type public.payment_request_status as enum ('pending', 'paid', 'cancelled', 'rejected', 'expired');
 exception when duplicate_object then null; end $$;
 
 create table if not exists public.payment_requests (

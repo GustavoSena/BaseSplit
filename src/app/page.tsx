@@ -4,6 +4,7 @@ import { useAccount, useReadContract } from "wagmi";
 import { useCapabilities, useWriteContracts, useCallsStatus } from "wagmi/experimental";
 import { useMemo } from "react";
 import { parseUnits, encodeFunctionData } from "viem";
+import { base } from "viem/chains";
 import {
   ConnectWallet,
   Wallet,
@@ -930,8 +931,8 @@ export default function Home() {
                                     <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
                                     <span className="text-xs px-2 py-0.5 rounded bg-yellow-800 text-yellow-300">pending</span>
                                   </div>
-                                  <p className="text-gray-500 font-mono text-xs mt-1">
-                                    From: {pr.profiles?.wallet_address?.slice(0, 6)}...{pr.profiles?.wallet_address?.slice(-4)}
+                                  <p className="text-gray-500 text-xs mt-1 flex items-center gap-1">
+                                    From: <Name address={pr.profiles?.wallet_address as `0x${string}`} chain={base} className="font-mono" />
                                   </p>
                                   {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
                                   {canPay && (
@@ -969,8 +970,8 @@ export default function Home() {
                                   <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
                                   <span className="text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-300">sent</span>
                                 </div>
-                                <p className="text-gray-500 font-mono text-xs mt-1">
-                                  To: {pr.payer_wallet_address?.slice(0, 6)}...{pr.payer_wallet_address?.slice(-4)}
+                                <p className="text-gray-500 text-xs mt-1 flex items-center gap-1">
+                                  To: <Name address={pr.payer_wallet_address as `0x${string}`} chain={base} className="font-mono" />
                                 </p>
                                 {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
                                 <button
