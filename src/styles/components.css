@@ -1,0 +1,160 @@
+/* Component Styles for BaseSplit */
+
+@layer components {
+  /* ==================== BUTTONS ==================== */
+  
+  /* Primary button (blue) */
+  .btn-primary {
+    @apply py-2 px-4 font-semibold rounded-lg transition-colors bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
+  }
+  
+  /* Secondary button (purple) */
+  .btn-secondary {
+    @apply py-2 px-4 font-semibold rounded-lg transition-colors bg-purple-600 hover:bg-purple-700 text-white;
+  }
+  
+  /* Success button (green) */
+  .btn-success {
+    @apply py-2 px-4 font-semibold rounded-lg transition-colors bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
+  }
+  
+  .btn-success-sm {
+    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-colors bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
+  }
+  
+  /* Danger button (red) */
+  .btn-danger {
+    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-colors bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/30;
+  }
+  
+  /* Ghost button (gray) */
+  .btn-ghost {
+    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-colors bg-gray-700 hover:bg-gray-600 text-gray-300;
+  }
+  
+  /* Icon button */
+  .btn-icon {
+    @apply p-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 text-gray-300 rounded-lg transition-colors;
+  }
+  
+  /* Nav buttons */
+  .btn-nav-active {
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-600 text-white;
+  }
+  
+  .btn-nav-inactive {
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-700;
+  }
+
+  /* ==================== INPUTS ==================== */
+  
+  .input {
+    @apply w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500;
+  }
+
+  /* ==================== CARDS ==================== */
+  
+  .card {
+    @apply bg-gray-900 rounded-lg p-4 space-y-3;
+  }
+  
+  .card-title {
+    @apply text-sm text-gray-400 font-medium;
+  }
+  
+  .balance-card {
+    @apply bg-gray-800 rounded-2xl p-6 text-center;
+  }
+
+  /* ==================== STATUS BADGES ==================== */
+  
+  .badge-pending {
+    @apply text-xs px-2 py-0.5 rounded bg-yellow-800 text-yellow-300;
+  }
+  
+  .badge-sent {
+    @apply text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-300;
+  }
+  
+  .badge-paid {
+    @apply text-xs px-2 py-0.5 rounded bg-green-800 text-green-300;
+  }
+  
+  .badge-rejected {
+    @apply text-xs px-2 py-0.5 rounded bg-orange-800 text-orange-300;
+  }
+  
+  .badge-cancelled {
+    @apply text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400;
+  }
+
+  /* ==================== LIST ITEMS ==================== */
+  
+  .list-item {
+    @apply text-white text-sm border-b border-gray-700 pb-3 last:border-0;
+  }
+  
+  .list-item-compact {
+    @apply text-white text-sm border-b border-gray-700 pb-2 last:border-0;
+  }
+
+  /* ==================== TEXT STYLES ==================== */
+  
+  .text-error {
+    @apply text-red-400 text-xs;
+  }
+  
+  .text-error-center {
+    @apply text-red-400 text-sm text-center;
+  }
+  
+  .text-muted {
+    @apply text-gray-500 text-sm text-center;
+  }
+  
+  .text-muted-xs {
+    @apply text-gray-500 text-xs;
+  }
+  
+  .wallet-address {
+    @apply text-gray-400 font-mono text-sm;
+  }
+  
+  .wallet-address-xs {
+    @apply text-gray-500 font-mono text-xs;
+  }
+
+  /* ==================== LAYOUT ==================== */
+  
+  .main-container {
+    @apply min-h-screen bg-gradient-to-b from-gray-900 to-black flex flex-col;
+  }
+  
+  .content-area {
+    @apply flex-1 overflow-auto pb-20 md:pb-8;
+  }
+  
+  .content-wrapper {
+    @apply max-w-lg mx-auto px-4 py-6 space-y-4;
+  }
+
+  /* ==================== NAV ==================== */
+  
+  .desktop-header {
+    @apply hidden md:block bg-gray-800/80 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-50;
+  }
+  
+  .mobile-nav {
+    @apply md:hidden fixed bottom-0 left-0 right-0 bg-gray-800/95 backdrop-blur-sm border-t border-gray-700 z-50;
+  }
+
+  /* ==================== DROPDOWN ==================== */
+  
+  .dropdown {
+    @apply absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto;
+  }
+  
+  .dropdown-item {
+    @apply w-full px-3 py-2 text-left hover:bg-gray-700 text-white text-sm;
+  }
+}
