@@ -126,8 +126,13 @@ export default function Home() {
     id: callsIdString || "",
     query: { 
       enabled: !!callsIdString,
-      // Poll every 2 seconds while we have a pending transaction
-      refetchInterval: callsIdString ? 2000 : false,
+      // Poll every 2 seconds only while transaction is pending (stop after success/failure)
+      refetchInterval: (query) => {
+        if (!callsIdString) return false;
+        const status = query.state.data?.status;
+        if (status === "success" || status === "failure") return false;
+        return 2000;
+      },
     },
   });
   

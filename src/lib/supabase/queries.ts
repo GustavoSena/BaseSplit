@@ -21,9 +21,12 @@ export interface Contact {
   updated_at: string;
 }
 
+export type PaymentRequestType = "request" | "transfer";
+
 export interface PaymentRequest {
   id: string;
   requester_id: string;
+  type: PaymentRequestType;
   payer_wallet_address: string;
   token_address: string;
   chain_id: number;
@@ -248,6 +251,7 @@ export async function createDirectTransfer(params: {
     .from("payment_requests")
     .insert({
       requester_id: params.senderId,
+      type: "transfer",
       payer_wallet_address: params.recipientWalletAddress.toLowerCase(),
       amount: params.amount,
       memo: params.memo || null,

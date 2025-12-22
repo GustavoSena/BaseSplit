@@ -93,9 +93,14 @@ do $$ begin
   create type public.payment_request_status as enum ('pending', 'paid', 'cancelled', 'rejected', 'expired');
 exception when duplicate_object then null; end $$;
 
+do $$ begin
+  create type public.payment_request_type as enum ('request', 'transfer');
+exception when duplicate_object then null; end $$;
+
 create table if not exists public.payment_requests (
   id uuid primary key default gen_random_uuid(),
   requester_id uuid not null references public.profiles(id) on delete cascade,
+  type public.payment_request_type not null default 'request',
 
   payer_wallet_address text not null,
   token_address text not null default '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913', -- USDC Base mainnet (lowercase)

@@ -223,3 +223,18 @@ ALTER TABLE public.profiles
 ADD COLUMN IF NOT EXISTS history_filter_default text NOT NULL DEFAULT 'all' 
 CHECK (history_filter_default IN ('all', 'contacts-only', 'external-only'));
 
+-- [2025-12-22] Add type field to payment_requests to distinguish requests from direct transfers
+-- This resolves semantic overload where requester_id/payer_wallet_address had reversed meanings
+-- For 'request': requester_id = person requesting payment, payer_wallet_address = person who pays
+-- For 'transfer': requester_id = sender, payer_wallet_address = recipient
+DO $$ BEGIN
+  CREATE TYPE public.payment_request_type AS ENUM ('request', 'transfer');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TABLE public.payment_requests 
+ADD COLUMN IF NOT EXISTS type text NOT NULL DEFAULT 'request'
+CHECK (type IN ('request', 'transfer'));
+
+-- Create index for efficient filtering by type
+CREATE INDEX IF NOT EXISTS payment_requests_type_idx ON public.payment_requests (type);
+
