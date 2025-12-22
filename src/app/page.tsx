@@ -123,7 +123,6 @@ export default function Home() {
   const txHash = callsStatus?.receipts?.[0]?.transactionHash;
 
   const updatePaymentRequestStatus = useCallback(async (requestId: string, hash: string) => {
-    console.log("[Payment] Updating payment request status:", { requestId, hash });
     const result = await updatePaymentRequestStatusQuery({
       requestId,
       status: "paid",
@@ -132,8 +131,6 @@ export default function Home() {
     
     if (result.error) {
       console.error("[Payment] Failed to update payment status:", result.error);
-    } else {
-      console.log("[Payment] Payment status updated successfully");
     }
     
     setPayingRequestId(null);
@@ -143,32 +140,22 @@ export default function Home() {
   useEffect(() => {
     setMounted(true);
   }, []);
-  
+
   // Refetch balance when wallet address changes
   useEffect(() => {
     if (currentWalletAddress) {
       refetchBalance();
     }
   }, [currentWalletAddress, refetchBalance]);
-  
+
   // Update payment request status when transaction is confirmed
   useEffect(() => {
-    console.log("[Payment] Status check:", { 
-      isConfirmed, 
-      txHash, 
-      payingRequestId,
-      callsStatus: callsStatus?.status,
-      callsIdString 
-    });
-    
-    // Use ref to avoid stale closure issues
     const requestId = payingRequestIdRef.current || payingRequestId;
     
     if (isConfirmed && txHash && requestId) {
-      console.log("[Payment] Transaction confirmed, updating database...");
       updatePaymentRequestStatus(requestId, txHash);
     }
-  }, [isConfirmed, txHash, payingRequestId, updatePaymentRequestStatus, callsStatus?.status, callsIdString]);
+  }, [isConfirmed, txHash, payingRequestId, updatePaymentRequestStatus]);
 
   // Handle tab change with refresh logic - must be before early returns
   const handleTabChange = useCallback((tabId: TabId) => {
@@ -245,6 +232,11 @@ export default function Home() {
     setActiveTab("requests");
   }, []);
 
+  // Memoized callback for clearing prefilled contact (prevents effect re-runs)
+  const clearPrefilledContact = useCallback(() => {
+    setRequestMoneyContact(null);
+  }, []);
+
   if (!mounted) {
     return <LoadingScreen />;
   }
@@ -314,7 +306,7 @@ export default function Home() {
               isSending={isSending}
               isConfirming={isConfirming}
               prefilledContact={requestMoneyContact}
-              onPrefilledContactUsed={() => setRequestMoneyContact(null)}
+              onPrefilledContactUsed={clearPrefilledContact}
             />
           )}
         </div>

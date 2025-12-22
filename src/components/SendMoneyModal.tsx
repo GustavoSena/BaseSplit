@@ -22,7 +22,12 @@ export function SendMoneyModal({
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = () => {
-    const amountNum = parseFloat(amount);
+    const trimmedAmount = amount.trim();
+    if (!trimmedAmount) {
+      setError("Please enter an amount");
+      return;
+    }
+    const amountNum = parseFloat(trimmedAmount);
     if (isNaN(amountNum) || amountNum < 0.01) {
       setError("Minimum amount is $0.01 USDC");
       return;

@@ -160,12 +160,18 @@ export function RequestsTab({
 
   // Save filter preference when changed
   const handleFilterChange = async (newFilter: HistoryFilterType) => {
+    const previousFilter = historyFilter;
     setHistoryFilter(newFilter);
     if (currentWalletAddress) {
-      await updateHistoryFilterPreference({
+      const result = await updateHistoryFilterPreference({
         walletAddress: currentWalletAddress,
         filterType: newFilter,
       });
+      if (result.error) {
+        // Revert to previous filter if persistence failed
+        setHistoryFilter(previousFilter);
+        console.error("Failed to save filter preference:", result.error);
+      }
     }
   };
 
@@ -179,15 +185,17 @@ export function RequestsTab({
   const [saveAsContactId, setSaveAsContactId] = useState<string | null>(null);
   const [saveAsContactLabel, setSaveAsContactLabel] = useState("");
   const [isSavingContact, setIsSavingContact] = useState(false);
+  const [saveContactError, setSaveContactError] = useState<string | null>(null);
 
   const handleSaveAsContact = async (walletAddress: string) => {
     if (!currentWalletAddress || !saveAsContactLabel.trim()) return;
     
     setIsSavingContact(true);
+    setSaveContactError(null);
     try {
       const profileResult = await getProfileIdByWallet(currentWalletAddress);
       if (!profileResult.data) {
-        console.error("Profile not found");
+        setSaveContactError("Profile not found. Please sign in again.");
         return;
       }
       
@@ -198,7 +206,7 @@ export function RequestsTab({
       });
       
       if (result.error) {
-        console.error("Failed to save contact:", result.error);
+        setSaveContactError("Failed to save contact. Please try again.");
       } else {
         loadContacts();
         setSaveAsContactId(null);
@@ -478,6 +486,9 @@ export function RequestsTab({
                           onChange={(e) => setSaveAsContactLabel(e.target.value)}
                           className="w-full text-sm px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white mb-2"
                         />
+                        {saveContactError && (
+                          <p className="text-red-400 text-xs mb-2">{saveContactError}</p>
+                        )}
                         <div className="flex gap-2">
                           <button
                             type="button"
@@ -489,7 +500,7 @@ export function RequestsTab({
                           </button>
                           <button
                             type="button"
-                            onClick={() => { setSaveAsContactId(null); setSaveAsContactLabel(""); }}
+                            onClick={() => { setSaveAsContactId(null); setSaveAsContactLabel(""); setSaveContactError(null); }}
                             className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
                           >
                             Cancel
@@ -607,10 +618,11 @@ export function RequestsTab({
 
             return allHistory.map((pr) => {
               const amountUSDC = (Number(pr.amount) / 1e6).toFixed(2);
-              // For "sent" requests: user sent a request (they're the requester), 
-              // when paid, they RECEIVE money (+)
-              // For "received" requests: user received a request (they're the payer),
-              // when paid, they SEND money (-)
+              // Balance change indicator:
+              // - "sent" = user CREATED the request (requesting payment FROM someone else)
+              //   → When paid, user's balance INCREASES (+) because they received money
+              // - "received" = user was ASKED to pay (someone requested payment FROM user)
+              //   → When paid, user's balance DECREASES (-) because they sent money
               const balanceChange = pr.direction === "sent" ? `+$${amountUSDC}` : `-$${amountUSDC}`;
               const balanceColor = pr.direction === "sent" ? "text-green-400" : "text-red-400";
 

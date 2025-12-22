@@ -65,19 +65,21 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
   // Delete state
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleDeleteContact = async (contactId: string) => {
     setIsDeleting(true);
+    setDeleteError(null);
     try {
       const result = await deleteContactQuery(contactId);
       if (result.error) {
-        console.error("Failed to delete contact:", result.error);
+        setDeleteError("Failed to delete contact. Please try again.");
       } else {
         await loadContacts();
+        setDeleteConfirmId(null);
       }
     } finally {
       setIsDeleting(false);
-      setDeleteConfirmId(null);
     }
   };
 
@@ -217,6 +219,9 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
               {deleteConfirmId === c.id && (
                 <div className="mt-2 p-2 bg-red-900/20 border border-red-800 rounded">
                   <p className="text-sm text-red-300 mb-2">Delete "{c.label}"?</p>
+                  {deleteError && (
+                    <p className="text-red-400 text-xs mb-2">{deleteError}</p>
+                  )}
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -228,7 +233,7 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
                     </button>
                     <button
                       type="button"
-                      onClick={() => setDeleteConfirmId(null)}
+                      onClick={() => { setDeleteConfirmId(null); setDeleteError(null); }}
                       className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
                     >
                       Cancel
