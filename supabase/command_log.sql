@@ -217,3 +217,9 @@ for each row execute function public.set_updated_at();
 -- Scroll to "Anonymous Sign-In" and toggle it ON
 -- This is required for the Web3 wallet authentication flow
 
+-- [2025-12-22] Add history_filter_default column to profiles table for issue #5
+-- This column stores user's preferred filter for the history view (all, contacts-only, external-only)
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS history_filter_default text NOT NULL DEFAULT 'all' 
+CHECK (history_filter_default IN ('all', 'contacts-only', 'external-only'));
+

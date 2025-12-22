@@ -12,6 +12,7 @@ create table if not exists public.profiles (
   wallet_address text unique not null,
   created_at timestamptz not null default now(),
   last_seen_at timestamptz not null default now(),
+  history_filter_default text not null default 'all' check (history_filter_default in ('all', 'contacts-only', 'external-only')),
   constraint profiles_wallet_lowercase check (wallet_address = lower(wallet_address))
 );
 
