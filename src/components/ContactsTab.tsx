@@ -1,15 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { TrashIcon, SendIcon, RequestIcon } from "./Icons";
 import {
   Contact,
   getProfileIdByWallet,
   getContactsByOwnerId,
   createContact,
+  deleteContact as deleteContactQuery,
 } from "@/lib/supabase/queries";
 
 interface ContactsTabProps {
   currentWalletAddress: string | null;
+  onSendMoney?: (contact: Contact) => void;
+  onRequestMoney?: (contact: Contact) => void;
 }
 
 export function useContacts(currentWalletAddress: string | null) {
@@ -47,7 +51,7 @@ export function useContacts(currentWalletAddress: string | null) {
   return { contacts, contactsError, loadContacts };
 }
 
-export function ContactsTab({ currentWalletAddress }: ContactsTabProps) {
+export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney }: ContactsTabProps) {
   const { contacts, contactsError, loadContacts } = useContacts(currentWalletAddress);
   
   // Form state - local to this component
@@ -57,6 +61,25 @@ export function ContactsTab({ currentWalletAddress }: ContactsTabProps) {
   const [newContactNote, setNewContactNote] = useState("");
   const [addContactError, setAddContactError] = useState<string | null>(null);
   const [isAddingContact, setIsAddingContact] = useState(false);
+  
+  // Delete state
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteContact = async (contactId: string) => {
+    setIsDeleting(true);
+    try {
+      const result = await deleteContactQuery(contactId);
+      if (result.error) {
+        console.error("Failed to delete contact:", result.error);
+      } else {
+        await loadContacts();
+      }
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmId(null);
+    }
+  };
 
   const addContact = async () => {
     if (!currentWalletAddress || !newContactAddress || !newContactLabel) return;
@@ -146,11 +169,73 @@ export function ContactsTab({ currentWalletAddress }: ContactsTabProps) {
         <div className="card space-y-2">
           {contacts.map((c) => (
             <div key={c.id} className="list-item-compact">
-              <span className="font-medium">{c.label}</span>
-              <span className="wallet-address-xs ml-2">
-                {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
-              </span>
-              {c.note && <p className="text-gray-400 text-xs mt-1">{c.note}</p>}
+              <div className="flex justify-between items-start">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{c.label}</span>
+                    <span className="wallet-address-xs">
+                      {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
+                    </span>
+                  </div>
+                  {c.note && <p className="text-gray-400 text-xs mt-1">{c.note}</p>}
+                </div>
+                
+                {/* Action buttons */}
+                <div className="flex items-center gap-1 ml-2">
+                  {onSendMoney && (
+                    <button
+                      type="button"
+                      onClick={() => onSendMoney(c)}
+                      className="p-1.5 text-green-400 hover:bg-green-900/30 rounded transition-colors"
+                      title="Send money"
+                    >
+                      <SendIcon size="sm" />
+                    </button>
+                  )}
+                  {onRequestMoney && (
+                    <button
+                      type="button"
+                      onClick={() => onRequestMoney(c)}
+                      className="p-1.5 text-blue-400 hover:bg-blue-900/30 rounded transition-colors"
+                      title="Request money"
+                    >
+                      <RequestIcon size="sm" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirmId(c.id)}
+                    className="p-1.5 text-red-400 hover:bg-red-900/30 rounded transition-colors"
+                    title="Delete contact"
+                  >
+                    <TrashIcon size="sm" />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Delete confirmation */}
+              {deleteConfirmId === c.id && (
+                <div className="mt-2 p-2 bg-red-900/20 border border-red-800 rounded">
+                  <p className="text-sm text-red-300 mb-2">Delete "{c.label}"?</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteContact(c.id)}
+                      disabled={isDeleting}
+                      className="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
+                    >
+                      {isDeleting ? "Deleting..." : "Delete"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirmId(null)}
+                      className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

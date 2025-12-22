@@ -15,6 +15,7 @@ import {
   createPaymentRequest as createPaymentRequestQuery,
   updatePaymentRequestStatus as updatePaymentRequestStatusQuery,
   updateHistoryFilterPreference,
+  createContact,
 } from "@/lib/supabase/queries";
 
 interface RequestsTabProps {
@@ -25,6 +26,8 @@ interface RequestsTabProps {
   payingRequestId: string | null;
   isSending: boolean;
   isConfirming: boolean;
+  prefilledContact?: Contact | null;
+  onPrefilledContactUsed?: () => void;
 }
 
 export function usePaymentRequests(currentWalletAddress: string | null) {
@@ -107,6 +110,8 @@ export function RequestsTab({
   payingRequestId,
   isSending,
   isConfirming,
+  prefilledContact,
+  onPrefilledContactUsed,
 }: RequestsTabProps) {
   const {
     paymentRequests,
@@ -129,6 +134,16 @@ export function RequestsTab({
   const [showHistory, setShowHistory] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilterType>("all");
   const [isFilterLoaded, setIsFilterLoaded] = useState(false);
+
+  // Handle prefilled contact from Contacts tab "Request Money" button
+  useEffect(() => {
+    if (prefilledContact) {
+      setNewPayerAddress(prefilledContact.contact_wallet_address);
+      setContactSearch(prefilledContact.label);
+      setShowCreateForm(true);
+      onPrefilledContactUsed?.();
+    }
+  }, [prefilledContact, onPrefilledContactUsed]);
 
   // Load user's filter preference from profile
   useEffect(() => {
@@ -159,6 +174,40 @@ export function RequestsTab({
     if (!address) return false;
     return contacts.some(c => c.contact_wallet_address.toLowerCase() === address.toLowerCase());
   }, [contacts]);
+
+  // Save as contact state (for issue #12)
+  const [saveAsContactId, setSaveAsContactId] = useState<string | null>(null);
+  const [saveAsContactLabel, setSaveAsContactLabel] = useState("");
+  const [isSavingContact, setIsSavingContact] = useState(false);
+
+  const handleSaveAsContact = async (walletAddress: string) => {
+    if (!currentWalletAddress || !saveAsContactLabel.trim()) return;
+    
+    setIsSavingContact(true);
+    try {
+      const profileResult = await getProfileIdByWallet(currentWalletAddress);
+      if (!profileResult.data) {
+        console.error("Profile not found");
+        return;
+      }
+      
+      const result = await createContact({
+        ownerId: profileResult.data.id,
+        contactWalletAddress: walletAddress,
+        label: saveAsContactLabel.trim(),
+      });
+      
+      if (result.error) {
+        console.error("Failed to save contact:", result.error);
+      } else {
+        loadContacts();
+        setSaveAsContactId(null);
+        setSaveAsContactLabel("");
+      }
+    } finally {
+      setIsSavingContact(false);
+    }
+  };
 
   const createPaymentRequest = async () => {
     if (!currentWalletAddress || !newPayerAddress || !newAmount) return;
@@ -414,6 +463,49 @@ export function RequestsTab({
                       Reject
                     </button>
                   </div>
+                )}
+                
+                {/* Save as Contact option - show if requester is not already a contact */}
+                {pr.profiles?.wallet_address && !isContact(pr.profiles.wallet_address) && (
+                  <>
+                    {saveAsContactId === pr.id ? (
+                      <div className="mt-2 p-2 bg-blue-900/20 border border-blue-800 rounded">
+                        <p className="text-xs text-blue-300 mb-2">Save as contact</p>
+                        <input
+                          type="text"
+                          placeholder="Contact name (e.g., Alice)"
+                          value={saveAsContactLabel}
+                          onChange={(e) => setSaveAsContactLabel(e.target.value)}
+                          className="w-full text-sm px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white mb-2"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSaveAsContact(pr.profiles!.wallet_address)}
+                            disabled={isSavingContact || !saveAsContactLabel.trim()}
+                            className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50"
+                          >
+                            {isSavingContact ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setSaveAsContactId(null); setSaveAsContactLabel(""); }}
+                            className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSaveAsContactId(pr.id)}
+                        className="mt-2 text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        + Save as contact
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             );

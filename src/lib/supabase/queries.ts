@@ -115,6 +115,18 @@ export async function createContact(params: {
   return { data, error: null };
 }
 
+export async function deleteContact(contactId: string): Promise<QueryResult<null>> {
+  const { error } = await supabase
+    .from("contacts")
+    .delete()
+    .eq("id", contactId);
+
+  if (error) {
+    return { data: null, error: error.message, errorCode: error.code };
+  }
+  return { data: null, error: null };
+}
+
 // Payment request queries
 export async function getIncomingPaymentRequests(payerWalletAddress: string): Promise<QueryResult<PaymentRequest[]>> {
   const { data, error } = await supabase

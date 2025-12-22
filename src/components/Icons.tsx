@@ -97,3 +97,36 @@ export function ExternalLinkIcon({ size = "sm", className = "", ...props }: Icon
     </Icon>
   );
 }
+
+export function TrashIcon({ size = "sm", className = "", ...props }: IconProps) {
+  return (
+    <Icon size={size} className={className} {...props}>
+      <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </Icon>
+  );
+}
+
+export function SendIcon({ size = "sm", className = "", ...props }: IconProps) {
+  return (
+    <Icon size={size} className={className} {...props}>
+      <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+    </Icon>
+  );
+}
+
+export function RequestIcon({ size = "sm", className = "", ...props }: IconProps) {
+  return (
+    <Icon size={size} className={className} {...props}>
+      <path d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <path d="M12 9v6" />
+    </Icon>
+  );
+}
+
+export function PlusIcon({ size = "sm", className = "", ...props }: IconProps) {
+  return (
+    <Icon size={size} className={className} {...props}>
+      <path d="M12 4v16m8-8H4" />
+    </Icon>
+  );
+}
