@@ -7,7 +7,7 @@ import { useIsSignedIn } from "@coinbase/cdp-hooks";
 import { ClipboardIcon } from "@/components/Icons";
 import { useSupabaseWeb3Auth } from "@/lib/auth/useSupabaseWeb3Auth";
 import { useCDPAuth } from "@/lib/auth/useCDPAuth";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { USDC_BASE_MAINNET } from "@/lib/constants";
 import { LoginScreen } from "@/components/LoginScreen";
 import { DesktopHeader, MobileNav, TabId } from "@/components/NavBar";
@@ -70,6 +70,7 @@ export default function Home() {
   const { contacts, loadContacts } = useContacts(currentWalletAddress);
   
   const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
+  const payingRequestIdRef = useRef<string | null>(null);
   
   // Tab state
   const [activeTab, setActiveTab] = useState<"requests" | "contacts" | "settings">("requests");
@@ -101,10 +102,14 @@ export default function Home() {
   
   // Sponsored transaction with useWriteContracts
   const { writeContracts, data: callsId, isPending: isSending } = useWriteContracts();
-  const callsIdString = typeof callsId === "string" ? callsId : callsId?.id;
+  const callsIdString = typeof callsId === "string" ? callsId : (callsId as { id?: string } | undefined)?.id;
   const { data: callsStatus } = useCallsStatus({
     id: callsIdString || "",
-    query: { enabled: !!callsIdString },
+    query: { 
+      enabled: !!callsIdString,
+      // Poll every 2 seconds while we have a pending transaction
+      refetchInterval: callsIdString ? 2000 : false,
+    },
   });
   
   const isConfirming = callsStatus?.status === "pending";
@@ -112,6 +117,7 @@ export default function Home() {
   const txHash = callsStatus?.receipts?.[0]?.transactionHash;
 
   const updatePaymentRequestStatus = useCallback(async (requestId: string, hash: string) => {
+    console.log("[Payment] Updating payment request status:", { requestId, hash });
     const result = await updatePaymentRequestStatusQuery({
       requestId,
       status: "paid",
@@ -119,10 +125,13 @@ export default function Home() {
     });
     
     if (result.error) {
-      console.error("Failed to update payment status:", result.error);
+      console.error("[Payment] Failed to update payment status:", result.error);
+    } else {
+      console.log("[Payment] Payment status updated successfully");
     }
     
     setPayingRequestId(null);
+    payingRequestIdRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -138,10 +147,22 @@ export default function Home() {
   
   // Update payment request status when transaction is confirmed
   useEffect(() => {
-    if (isConfirmed && txHash && payingRequestId) {
-      updatePaymentRequestStatus(payingRequestId, txHash);
+    console.log("[Payment] Status check:", { 
+      isConfirmed, 
+      txHash, 
+      payingRequestId,
+      callsStatus: callsStatus?.status,
+      callsIdString 
+    });
+    
+    // Use ref to avoid stale closure issues
+    const requestId = payingRequestIdRef.current || payingRequestId;
+    
+    if (isConfirmed && txHash && requestId) {
+      console.log("[Payment] Transaction confirmed, updating database...");
+      updatePaymentRequestStatus(requestId, txHash);
     }
-  }, [isConfirmed, txHash, payingRequestId, updatePaymentRequestStatus]);
+  }, [isConfirmed, txHash, payingRequestId, updatePaymentRequestStatus, callsStatus?.status, callsIdString]);
 
   // Handle tab change with refresh logic - must be before early returns
   const handleTabChange = useCallback((tabId: TabId) => {
@@ -165,6 +186,9 @@ export default function Home() {
     }
     
     setPayingRequestId(request.id);
+    payingRequestIdRef.current = request.id;
+    
+    console.log("[Payment] Initiating payment for request:", request.id);
     
     // Use writeContracts with paymaster for gasless transaction
     writeContracts({
