@@ -216,6 +216,37 @@ export async function updatePaymentRequestStatus(params: {
 }
 
 /**
+ * Create a direct transfer record for history tracking.
+ * This creates a "paid" payment request to represent a direct transfer.
+ */
+export async function createDirectTransfer(params: {
+  senderId: string;
+  recipientWalletAddress: string;
+  amount: number;
+  memo?: string | null;
+  txHash: string;
+}): Promise<QueryResult<PaymentRequest>> {
+  const { data, error } = await supabase
+    .from("payment_requests")
+    .insert({
+      requester_id: params.senderId,
+      payer_wallet_address: params.recipientWalletAddress.toLowerCase(),
+      amount: params.amount,
+      memo: params.memo || null,
+      status: "paid",
+      tx_hash: params.txHash,
+      paid_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return { data: null, error: error.message, errorCode: error.code };
+  }
+  return { data, error: null };
+}
+
+/**
  * Update a user's history filter preference.
  */
 export async function updateHistoryFilterPreference(params: {

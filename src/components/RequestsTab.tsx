@@ -28,6 +28,7 @@ interface RequestsTabProps {
   isConfirming: boolean;
   prefilledContact?: Contact | null;
   onPrefilledContactUsed?: () => void;
+  onSendMoney?: (toAddress: string, amount: number, memo?: string, saveAsContact?: boolean, contactLabel?: string) => void;
 }
 
 export function usePaymentRequests(currentWalletAddress: string | null) {
@@ -112,6 +113,7 @@ export function RequestsTab({
   isConfirming,
   prefilledContact,
   onPrefilledContactUsed,
+  onSendMoney,
 }: RequestsTabProps) {
   const {
     paymentRequests,
@@ -124,6 +126,7 @@ export function RequestsTab({
 
   // Form state
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showSendForm, setShowSendForm] = useState(false);
   const [newPayerAddress, setNewPayerAddress] = useState("");
   const [newAmount, setNewAmount] = useState("");
   const [newMemo, setNewMemo] = useState("");
@@ -134,6 +137,10 @@ export function RequestsTab({
   const [showHistory, setShowHistory] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilterType>("all");
   const [isFilterLoaded, setIsFilterLoaded] = useState(false);
+  
+  // Save as contact state for request/send forms
+  const [saveNewContact, setSaveNewContact] = useState(false);
+  const [newContactLabel, setNewContactLabel] = useState("");
 
   // Handle prefilled contact from Contacts tab "Request Money" button
   useEffect(() => {
@@ -250,18 +257,59 @@ export function RequestsTab({
       
       if (result.error) throw new Error(result.error);
       
+      // Save as contact if checkbox was checked and address is not already a contact
+      if (saveNewContact && newContactLabel.trim() && !isContact(newPayerAddress)) {
+        await createContact({
+          ownerId: profileResult.data.id,
+          contactWalletAddress: newPayerAddress,
+          label: newContactLabel.trim(),
+        });
+        loadContacts();
+      }
+      
       setNewPayerAddress("");
       setNewAmount("");
       setNewMemo("");
       setContactSearch("");
       setShowContactDropdown(false);
       setShowCreateForm(false);
+      setSaveNewContact(false);
+      setNewContactLabel("");
       await loadPaymentRequests();
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Failed to create payment request");
     } finally {
       setIsCreating(false);
     }
+  };
+
+  // Handle sending money directly
+  const handleSendMoney = () => {
+    if (!currentWalletAddress || !newPayerAddress || !newAmount || !onSendMoney) return;
+    
+    const trimmedAmount = newAmount.trim();
+    if (!trimmedAmount) {
+      setCreateError("Please enter an amount");
+      return;
+    }
+    const amount = parseFloat(trimmedAmount);
+    if (isNaN(amount) || amount < 0.01) {
+      setCreateError("Minimum amount is $0.01 USDC");
+      return;
+    }
+    if (amount > 10000) {
+      setCreateError("Maximum amount is $10,000 USDC");
+      return;
+    }
+    
+    setCreateError(null);
+    onSendMoney(
+      newPayerAddress, 
+      amount, 
+      newMemo || undefined,
+      saveNewContact && !isContact(newPayerAddress) ? true : undefined,
+      saveNewContact ? newContactLabel.trim() : undefined
+    );
   };
 
   const cancelRequest = async (requestId: string, action: "reject" | "cancel") => {
@@ -300,23 +348,49 @@ export function RequestsTab({
 
   return (
     <>
-      {/* Header with Create and Refresh */}
+      {/* Header with Request, Send, and Refresh */}
       <div className="flex gap-2">
         <button
           onClick={() => {
             const newState = !showCreateForm;
             setShowCreateForm(newState);
+            setShowSendForm(false);
             if (newState) {
               loadContacts();
             } else {
               setContactSearch("");
               setShowContactDropdown(false);
               setNewPayerAddress("");
+              setNewAmount("");
+              setNewMemo("");
+              setSaveNewContact(false);
+              setNewContactLabel("");
             }
           }}
-          className="flex-1 btn-success"
+          className={`flex-1 ${showCreateForm ? "btn-secondary" : "btn-success"}`}
         >
-          {showCreateForm ? "Cancel" : "Create Request"}
+          {showCreateForm ? "Cancel" : "Request"}
+        </button>
+        <button
+          onClick={() => {
+            const newState = !showSendForm;
+            setShowSendForm(newState);
+            setShowCreateForm(false);
+            if (newState) {
+              loadContacts();
+            } else {
+              setContactSearch("");
+              setShowContactDropdown(false);
+              setNewPayerAddress("");
+              setNewAmount("");
+              setNewMemo("");
+              setSaveNewContact(false);
+              setNewContactLabel("");
+            }
+          }}
+          className={`flex-1 ${showSendForm ? "btn-secondary" : "btn-primary"}`}
+        >
+          {showSendForm ? "Cancel" : "Send"}
         </button>
         <button
           onClick={() => loadPaymentRequests(true)}
@@ -414,15 +488,164 @@ export function RequestsTab({
             onChange={(e) => setNewMemo(e.target.value)}
             className="input"
           />
+          
+          {/* Save as contact option - show only if address is not already a contact */}
+          {newPayerAddress && !isContact(newPayerAddress) && (
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={saveNewContact}
+                  onChange={(e) => setSaveNewContact(e.target.checked)}
+                  className="rounded border-gray-600 bg-gray-700 text-blue-500"
+                />
+                Save as contact
+              </label>
+              {saveNewContact && (
+                <input
+                  type="text"
+                  placeholder="Contact name (e.g., Alice)"
+                  value={newContactLabel}
+                  onChange={(e) => setNewContactLabel(e.target.value)}
+                  className="input text-sm"
+                />
+              )}
+            </div>
+          )}
+          
           {createError && (
             <p className="text-error">{createError}</p>
           )}
           <button
             onClick={createPaymentRequest}
-            disabled={isCreating || !newPayerAddress || !newAmount}
+            disabled={isCreating || !newPayerAddress || !newAmount || (saveNewContact && !newContactLabel.trim())}
             className="w-full btn-primary"
           >
             {isCreating ? "Creating..." : "Create Request"}
+          </button>
+        </div>
+      )}
+
+      {/* Send Money Form */}
+      {showSendForm && (
+        <div className="card">
+          <p className="card-title">Send Money</p>
+          
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search contacts or enter wallet address..."
+              value={contactSearch}
+              onChange={(e) => {
+                const value = e.target.value;
+                setContactSearch(value);
+                if (value === "") {
+                  setNewPayerAddress("");
+                  setShowContactDropdown(contacts.length > 0);
+                } else if (value.startsWith("0x")) {
+                  setNewPayerAddress(value);
+                  setShowContactDropdown(false);
+                } else {
+                  setShowContactDropdown(contacts.length > 0);
+                }
+              }}
+              onFocus={() => {
+                if (contacts.length > 0 && !contactSearch.startsWith("0x")) {
+                  setShowContactDropdown(true);
+                }
+              }}
+              className="input"
+            />
+            
+            {showContactDropdown && contacts.length > 0 && (() => {
+              const filteredContacts = contacts.filter(c => 
+                contactSearch === "" ||
+                c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
+                c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
+              );
+              return (
+                <div className="dropdown">
+                  {filteredContacts.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setNewPayerAddress(c.contact_wallet_address);
+                        setContactSearch(c.label);
+                        setShowContactDropdown(false);
+                      }}
+                      className="dropdown-item flex justify-between items-center"
+                    >
+                      <span className="font-medium">{c.label}</span>
+                      <span className="text-gray-500 text-xs font-mono truncate ml-2">
+                        {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
+                      </span>
+                    </button>
+                  ))}
+                  {filteredContacts.length === 0 && (
+                    <p className="px-3 py-2 text-gray-500 text-sm">No matching contacts</p>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+          
+          {newPayerAddress && (
+            <p className="text-xs text-gray-500 font-mono truncate">
+              To: {newPayerAddress}
+            </p>
+          )}
+          
+          <input
+            type="number"
+            placeholder="Amount (USDC)"
+            value={newAmount}
+            onChange={(e) => setNewAmount(e.target.value)}
+            step="0.01"
+            min="0"
+            className="input"
+          />
+          <input
+            type="text"
+            placeholder="Memo (optional)"
+            value={newMemo}
+            onChange={(e) => setNewMemo(e.target.value)}
+            className="input"
+          />
+          
+          {/* Save as contact option - show only if address is not already a contact */}
+          {newPayerAddress && !isContact(newPayerAddress) && (
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={saveNewContact}
+                  onChange={(e) => setSaveNewContact(e.target.checked)}
+                  className="rounded border-gray-600 bg-gray-700 text-blue-500"
+                />
+                Save as contact
+              </label>
+              {saveNewContact && (
+                <input
+                  type="text"
+                  placeholder="Contact name (e.g., Alice)"
+                  value={newContactLabel}
+                  onChange={(e) => setNewContactLabel(e.target.value)}
+                  className="input text-sm"
+                />
+              )}
+            </div>
+          )}
+          
+          {createError && (
+            <p className="text-error">{createError}</p>
+          )}
+          <button
+            onClick={handleSendMoney}
+            disabled={isSending || isConfirming || !newPayerAddress || !newAmount || (saveNewContact && !newContactLabel.trim())}
+            className="w-full btn-success"
+          >
+            {isSending ? "Sending..." : isConfirming ? "Confirming..." : "Send Money"}
           </button>
         </div>
       )}

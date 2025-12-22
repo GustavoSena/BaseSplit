@@ -21,6 +21,9 @@ import {
   Contact,
   PaymentRequest,
   updatePaymentRequestStatus as updatePaymentRequestStatusQuery,
+  createDirectTransfer,
+  getProfileIdByWallet,
+  createContact,
 } from "@/lib/supabase/queries";
 
 const ERC20_ABI = [
@@ -77,6 +80,16 @@ export default function Home() {
   // Send money modal state
   const [sendMoneyContact, setSendMoneyContact] = useState<Contact | null>(null);
   const [requestMoneyContact, setRequestMoneyContact] = useState<Contact | null>(null);
+  
+  // Pending transfer state for recording to history
+  const [pendingTransfer, setPendingTransfer] = useState<{
+    toAddress: string;
+    amount: number;
+    memo?: string;
+    saveAsContact?: boolean;
+    contactLabel?: string;
+  } | null>(null);
+  const pendingTransferRef = useRef<typeof pendingTransfer>(null);
   
   // Tab state
   const [activeTab, setActiveTab] = useState<"requests" | "contacts" | "settings">("requests");
@@ -197,13 +210,15 @@ export default function Home() {
     });
   }, [address, writeContracts, capabilities]);
 
-  // Send money directly to a contact
+  // Send money directly to a contact (from ContactsTab modal)
   const sendDirectMoney = useCallback((toAddress: string, amount: number) => {
     if (!address) return;
     
     const amountInMicroUnits = Math.floor(amount * 1e6);
     
-    console.log("[Payment] Sending direct transfer:", { toAddress, amount, amountInMicroUnits });
+    // Track pending transfer for history recording
+    setPendingTransfer({ toAddress, amount: amountInMicroUnits });
+    pendingTransferRef.current = { toAddress, amount: amountInMicroUnits };
     
     writeContracts({
       contracts: [
@@ -218,13 +233,75 @@ export default function Home() {
     });
   }, [address, writeContracts, capabilities]);
 
+  // Send money from RequestsTab form (with optional save as contact)
+  const sendMoneyFromRequests = useCallback((toAddress: string, amount: number, memo?: string, saveAsContact?: boolean, contactLabel?: string) => {
+    if (!address) return;
+    
+    const amountInMicroUnits = Math.floor(amount * 1e6);
+    
+    // Track pending transfer for history recording
+    setPendingTransfer({ toAddress, amount: amountInMicroUnits, memo, saveAsContact, contactLabel });
+    pendingTransferRef.current = { toAddress, amount: amountInMicroUnits, memo, saveAsContact, contactLabel };
+    
+    writeContracts({
+      contracts: [
+        {
+          address: USDC_BASE_MAINNET as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "transfer",
+          args: [toAddress as `0x${string}`, BigInt(amountInMicroUnits)],
+        },
+      ],
+      capabilities,
+    });
+  }, [address, writeContracts, capabilities]);
+
+  // Record transfer to history and handle save as contact when transaction is confirmed
+  useEffect(() => {
+    const recordTransfer = async () => {
+      const transfer = pendingTransferRef.current || pendingTransfer;
+      if (!isConfirmed || !txHash || !transfer || !currentWalletAddress) return;
+      
+      try {
+        const profileResult = await getProfileIdByWallet(currentWalletAddress);
+        if (profileResult.data) {
+          // Record transfer to history
+          await createDirectTransfer({
+            senderId: profileResult.data.id,
+            recipientWalletAddress: transfer.toAddress,
+            amount: transfer.amount,
+            memo: transfer.memo,
+            txHash,
+          });
+          
+          // Save as contact if requested
+          if (transfer.saveAsContact && transfer.contactLabel) {
+            await createContact({
+              ownerId: profileResult.data.id,
+              contactWalletAddress: transfer.toAddress,
+              label: transfer.contactLabel,
+            });
+            loadContacts();
+          }
+        }
+      } catch (err) {
+        console.error("Failed to record transfer:", err);
+      }
+      
+      setPendingTransfer(null);
+      pendingTransferRef.current = null;
+      refetchBalance();
+    };
+    
+    recordTransfer();
+  }, [isConfirmed, txHash, pendingTransfer, currentWalletAddress, loadContacts, refetchBalance]);
+
   // Close send money modal when transaction is confirmed
   useEffect(() => {
     if (isConfirmed && sendMoneyContact) {
       setSendMoneyContact(null);
-      refetchBalance();
     }
-  }, [isConfirmed, sendMoneyContact, refetchBalance]);
+  }, [isConfirmed, sendMoneyContact]);
 
   // Handle request money - switch to requests tab with pre-filled contact
   const handleRequestMoney = useCallback((contact: Contact) => {
@@ -307,6 +384,7 @@ export default function Home() {
               isConfirming={isConfirming}
               prefilledContact={requestMoneyContact}
               onPrefilledContactUsed={clearPrefilledContact}
+              onSendMoney={(toAddress, amount, memo, saveAsContact, contactLabel) => sendMoneyFromRequests(toAddress, amount, memo, saveAsContact, contactLabel)}
             />
           )}
         </div>
