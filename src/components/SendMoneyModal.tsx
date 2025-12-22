@@ -11,6 +11,19 @@ interface SendMoneyModalProps {
   isConfirming: boolean;
 }
 
+/**
+ * Modal UI for sending USDC to a contact.
+ *
+ * Validates the entered amount (must be at least $0.01 and at most $10,000) and invokes `onSend` with
+ * the contact's wallet address and the parsed numeric amount when submission is valid.
+ *
+ * @param contact - Recipient contact whose label and wallet address are displayed
+ * @param onClose - Callback invoked to close the modal
+ * @param onSend - Callback invoked as `onSend(address, amount)` when a valid send is submitted
+ * @param isSending - When true, the UI shows the sending state and disables inputs/actions
+ * @param isConfirming - When true, the UI shows the confirming state and disables inputs/actions
+ * @returns The modal's JSX element
+ */
 export function SendMoneyModal({
   contact,
   onClose,

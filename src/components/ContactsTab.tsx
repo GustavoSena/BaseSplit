@@ -16,6 +16,15 @@ interface ContactsTabProps {
   onRequestMoney?: (contact: Contact) => void;
 }
 
+/**
+ * Loads and exposes contacts associated with the given wallet address.
+ *
+ * @param currentWalletAddress - Wallet address used to resolve the owner profile and fetch contacts; if `null`, no contacts are loaded.
+ * @returns An object containing:
+ *  - `contacts`: the list of fetched `Contact` items (empty array when none).
+ *  - `contactsError`: an error message when loading fails, or `null` when there is no error.
+ *  - `loadContacts`: a function to re-fetch the contacts for the current `currentWalletAddress`.
+ */
 export function useContacts(currentWalletAddress: string | null) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactsError, setContactsError] = useState<string | null>(null);
@@ -51,6 +60,17 @@ export function useContacts(currentWalletAddress: string | null) {
   return { contacts, contactsError, loadContacts };
 }
 
+/**
+ * Render the Contacts tab UI allowing the user to view, add, request, send, and delete contacts.
+ *
+ * This component loads contacts for the provided wallet, presents an add-contact form, per-contact
+ * actions (send, request, delete), and displays loading/error states for add/delete operations.
+ *
+ * @param currentWalletAddress - The current user's wallet address used to load and manage contacts; pass `null` when not signed in.
+ * @param onSendMoney - Optional callback invoked with a contact when the user chooses to send money.
+ * @param onRequestMoney - Optional callback invoked with a contact when the user chooses to request money.
+ * @returns The JSX element for the contacts management tab.
+ */
 export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney }: ContactsTabProps) {
   const { contacts, contactsError, loadContacts } = useContacts(currentWalletAddress);
   

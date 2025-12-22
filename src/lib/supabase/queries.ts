@@ -92,6 +92,13 @@ export async function getContactsByOwnerId(ownerId: string): Promise<QueryResult
   return { data: data || [], error: null };
 }
 
+/**
+ * Creates a new contact record for the given owner.
+ *
+ * @param params.contactWalletAddress - Wallet address of the contact; it will be lowercased before storage.
+ * @param params.note - Optional note for the contact; `null` will be stored when omitted.
+ * @returns The inserted contact record in `data` on success; on failure `data` is `null` and `error` and `errorCode` contain the error message and code.
+ */
 export async function createContact(params: {
   ownerId: string;
   contactWalletAddress: string;
@@ -115,6 +122,12 @@ export async function createContact(params: {
   return { data, error: null };
 }
 
+/**
+ * Deletes a contact row by its id.
+ *
+ * @param contactId - The contact's unique identifier
+ * @returns `data` is `null`. `error` contains the database error message and `errorCode` contains the database error code when deletion fails; otherwise `error` is `null`.
+ */
 export async function deleteContact(contactId: string): Promise<QueryResult<null>> {
   const { error } = await supabase
     .from("contacts")
@@ -127,7 +140,12 @@ export async function deleteContact(contactId: string): Promise<QueryResult<null
   return { data: null, error: null };
 }
 
-// Payment request queries
+/**
+ * Fetches payment requests where the specified wallet is the payer.
+ *
+ * @param payerWalletAddress - Wallet address of the payer; lookup is performed using the lowercased address.
+ * @returns The matching payment requests, each including the requester's profile `wallet_address` when available; returns an empty array if no requests are found.
+ */
 export async function getIncomingPaymentRequests(payerWalletAddress: string): Promise<QueryResult<PaymentRequest[]>> {
   const { data, error } = await supabase
     .from("payment_requests")
@@ -216,7 +234,14 @@ export async function updatePaymentRequestStatus(params: {
 }
 
 /**
- * Update a user's history filter preference.
+ * Set a profile's default history filter.
+ *
+ * Updates the profile record matching the provided wallet address (compared case-insensitively)
+ * to use the given history filter type and returns the updated profile.
+ *
+ * @param params.walletAddress - The wallet address of the profile to update (any case).
+ * @param params.filterType - The desired default history filter value.
+ * @returns The updated Profile on success, or `null` with an `error` and optional `errorCode` on failure.
  */
 export async function updateHistoryFilterPreference(params: {
   walletAddress: string;

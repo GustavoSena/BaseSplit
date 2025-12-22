@@ -30,6 +30,18 @@ interface RequestsTabProps {
   onPrefilledContactUsed?: () => void;
 }
 
+/**
+ * Manage and load incoming and sent payment requests for the specified wallet address.
+ *
+ * @param currentWalletAddress - The wallet address whose payment requests should be loaded; pass `null` to disable loading.
+ * @returns An object with the current request state and actions:
+ * - `paymentRequests`: array of incoming `PaymentRequest` items for the current wallet.
+ * - `sentRequests`: array of `PaymentRequest` items created by the profile that owns the current wallet.
+ * - `paymentRequestsError`: an error message string when loading fails, or `null` when no error.
+ * - `setPaymentRequestsError`: setter for `paymentRequestsError`.
+ * - `isRefreshing`: `true` when a manual refresh indicator is shown.
+ * - `loadPaymentRequests`: function to reload requests; accepts an optional `showRefreshIndicator: boolean` to display the refresh indicator during the load.
+ */
 export function usePaymentRequests(currentWalletAddress: string | null) {
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<PaymentRequest[]>([]);
@@ -102,6 +114,23 @@ export function usePaymentRequests(currentWalletAddress: string | null) {
   };
 }
 
+/**
+ * Render the Requests tab UI for creating, listing, and managing payment requests.
+ *
+ * Provides controls to create a new payment request, refresh and view incoming/sent pending requests,
+ * save requesters as contacts, cancel or reject requests, and browse completed request history with filters.
+ *
+ * @param currentWalletAddress - The currently connected wallet address, or `null` if not connected.
+ * @param contacts - List of saved contacts used to autofill payer addresses and filter history.
+ * @param loadContacts - Callback to reload contacts after creating or saving a contact.
+ * @param payPaymentRequest - Callback invoked to initiate payment for a given payment request.
+ * @param payingRequestId - ID of the request currently being paid, used to show progress state.
+ * @param isSending - True while a send transaction is being submitted.
+ * @param isConfirming - True while a send transaction is awaiting confirmation.
+ * @param prefilledContact - Optional contact provided by other UI to prefill the create-request form.
+ * @param onPrefilledContactUsed - Optional callback invoked when a `prefilledContact` has been applied.
+ * @returns The rendered Requests tab as a JSX element.
+ */
 export function RequestsTab({
   currentWalletAddress,
   contacts,
