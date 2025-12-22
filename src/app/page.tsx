@@ -15,8 +15,10 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { ContactsTab, useContacts } from "@/components/ContactsTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { RequestsTab } from "@/components/RequestsTab";
+import { SendMoneyModal } from "@/components/SendMoneyModal";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import {
+  Contact,
   PaymentRequest,
   updatePaymentRequestStatus as updatePaymentRequestStatusQuery,
 } from "@/lib/supabase/queries";
@@ -71,6 +73,10 @@ export default function Home() {
   
   const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
   const payingRequestIdRef = useRef<string | null>(null);
+  
+  // Send money modal state
+  const [sendMoneyContact, setSendMoneyContact] = useState<Contact | null>(null);
+  const [requestMoneyContact, setRequestMoneyContact] = useState<Contact | null>(null);
   
   // Tab state
   const [activeTab, setActiveTab] = useState<"requests" | "contacts" | "settings">("requests");
@@ -204,6 +210,41 @@ export default function Home() {
     });
   }, [address, writeContracts, capabilities]);
 
+  // Send money directly to a contact
+  const sendDirectMoney = useCallback((toAddress: string, amount: number) => {
+    if (!address) return;
+    
+    const amountInMicroUnits = Math.floor(amount * 1e6);
+    
+    console.log("[Payment] Sending direct transfer:", { toAddress, amount, amountInMicroUnits });
+    
+    writeContracts({
+      contracts: [
+        {
+          address: USDC_BASE_MAINNET as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "transfer",
+          args: [toAddress as `0x${string}`, BigInt(amountInMicroUnits)],
+        },
+      ],
+      capabilities,
+    });
+  }, [address, writeContracts, capabilities]);
+
+  // Close send money modal when transaction is confirmed
+  useEffect(() => {
+    if (isConfirmed && sendMoneyContact) {
+      setSendMoneyContact(null);
+      refetchBalance();
+    }
+  }, [isConfirmed, sendMoneyContact, refetchBalance]);
+
+  // Handle request money - switch to requests tab with pre-filled contact
+  const handleRequestMoney = useCallback((contact: Contact) => {
+    setRequestMoneyContact(contact);
+    setActiveTab("requests");
+  }, []);
+
   if (!mounted) {
     return <LoadingScreen />;
   }
@@ -244,7 +285,11 @@ export default function Home() {
           {/* Tab Content */}
           {/* Contacts Tab */}
           {activeTab === "contacts" && (
-            <ContactsTab currentWalletAddress={currentWalletAddress} />
+            <ContactsTab 
+              currentWalletAddress={currentWalletAddress}
+              onSendMoney={(contact) => setSendMoneyContact(contact)}
+              onRequestMoney={handleRequestMoney}
+            />
           )}
 
           {/* Settings Tab */}
@@ -268,12 +313,25 @@ export default function Home() {
               payingRequestId={payingRequestId}
               isSending={isSending}
               isConfirming={isConfirming}
+              prefilledContact={requestMoneyContact}
+              onPrefilledContactUsed={() => setRequestMoneyContact(null)}
             />
           )}
         </div>
       </div>  
 
       <MobileNav activeTab={activeTab} onTabChange={handleTabChange} />
+
+      {/* Send Money Modal */}
+      {sendMoneyContact && (
+        <SendMoneyModal
+          contact={sendMoneyContact}
+          onClose={() => setSendMoneyContact(null)}
+          onSend={sendDirectMoney}
+          isSending={isSending}
+          isConfirming={isConfirming}
+        />
+      )}
     </main>
   );
 }
