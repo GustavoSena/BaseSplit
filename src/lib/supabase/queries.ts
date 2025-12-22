@@ -1,11 +1,14 @@
 import { supabase } from "./client";
 import { isNoRowsError } from "../errors";
 
+export type HistoryFilterType = "all" | "contacts-only" | "external-only";
+
 export interface Profile {
   id: string;
   wallet_address: string;
   created_at: string;
   last_seen_at: string;
+  history_filter_default: HistoryFilterType;
 }
 
 export interface Contact {
@@ -191,6 +194,26 @@ export async function updatePaymentRequestStatus(params: {
     .from("payment_requests")
     .update(updateData)
     .eq("id", params.requestId)
+    .select()
+    .single();
+
+  if (error) {
+    return { data: null, error: error.message, errorCode: error.code };
+  }
+  return { data, error: null };
+}
+
+/**
+ * Update a user's history filter preference.
+ */
+export async function updateHistoryFilterPreference(params: {
+  walletAddress: string;
+  filterType: HistoryFilterType;
+}): Promise<QueryResult<Profile>> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({ history_filter_default: params.filterType })
+    .eq("wallet_address", params.walletAddress.toLowerCase())
     .select()
     .single();
 

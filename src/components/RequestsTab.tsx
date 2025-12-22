@@ -7,11 +7,14 @@ import { RefreshIcon, ChevronDownIcon } from "./Icons";
 import {
   Contact,
   PaymentRequest,
+  HistoryFilterType,
+  getProfileByWallet,
   getProfileIdByWallet,
   getIncomingPaymentRequests,
   getSentPaymentRequests,
   createPaymentRequest as createPaymentRequestQuery,
   updatePaymentRequestStatus as updatePaymentRequestStatusQuery,
+  updateHistoryFilterPreference,
 } from "@/lib/supabase/queries";
 
 interface RequestsTabProps {
@@ -124,6 +127,38 @@ export function RequestsTab({
   const [contactSearch, setContactSearch] = useState("");
   const [showContactDropdown, setShowContactDropdown] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilterType>("all");
+  const [isFilterLoaded, setIsFilterLoaded] = useState(false);
+
+  // Load user's filter preference from profile
+  useEffect(() => {
+    const loadFilterPreference = async () => {
+      if (!currentWalletAddress) return;
+      const result = await getProfileByWallet(currentWalletAddress);
+      if (result.data?.history_filter_default) {
+        setHistoryFilter(result.data.history_filter_default);
+      }
+      setIsFilterLoaded(true);
+    };
+    loadFilterPreference();
+  }, [currentWalletAddress]);
+
+  // Save filter preference when changed
+  const handleFilterChange = async (newFilter: HistoryFilterType) => {
+    setHistoryFilter(newFilter);
+    if (currentWalletAddress) {
+      await updateHistoryFilterPreference({
+        walletAddress: currentWalletAddress,
+        filterType: newFilter,
+      });
+    }
+  };
+
+  // Helper to check if an address is a contact
+  const isContact = useCallback((address: string | undefined) => {
+    if (!address) return false;
+    return contacts.some(c => c.contact_wallet_address.toLowerCase() === address.toLowerCase());
+  }, [contacts]);
 
   const createPaymentRequest = async () => {
     if (!currentWalletAddress || !newPayerAddress || !newAmount) return;
@@ -431,7 +466,18 @@ export function RequestsTab({
       {/* History Section */}
       {showHistory && (
         <div className="card">
-          <p className="card-title">History</p>
+          <div className="flex justify-between items-center mb-3">
+            <p className="card-title mb-0">History</p>
+            <select
+              value={historyFilter}
+              onChange={(e) => handleFilterChange(e.target.value as HistoryFilterType)}
+              className="text-xs bg-gray-700 text-gray-200 border border-gray-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="all">All</option>
+              <option value="contacts-only">Contacts Only</option>
+              <option value="external-only">External Only</option>
+            </select>
+          </div>
           {(() => {
             const completedIncoming = paymentRequests.filter(pr => pr.status !== "pending");
             const completedSent = sentRequests.filter(pr => pr.status !== "pending");
@@ -446,6 +492,17 @@ export function RequestsTab({
                 seenIds.add(pr.id);
                 return true;
               })
+              .filter(pr => {
+                // Apply contact filter
+                if (historyFilter === "all") return true;
+                const otherAddress = pr.direction === "sent" 
+                  ? pr.payer_wallet_address 
+                  : pr.profiles?.wallet_address;
+                const isContactAddress = isContact(otherAddress);
+                if (historyFilter === "contacts-only") return isContactAddress;
+                if (historyFilter === "external-only") return !isContactAddress;
+                return true;
+              })
               .sort((a, b) => {
                 const dateA = a.status === "paid" && a.paid_at ? a.paid_at : a.created_at;
                 const dateB = b.status === "paid" && b.paid_at ? b.paid_at : b.created_at;
@@ -456,41 +513,58 @@ export function RequestsTab({
               return <p className="text-muted">No history yet</p>;
             }
 
-            return allHistory.map((pr) => (
-              <div key={pr.id} className="list-item">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs ${pr.direction === "sent" ? "text-blue-400" : "text-purple-400"}`}>
-                      {pr.direction === "sent" ? "↑ Sent" : "↓ Received"}
-                    </span>
-                    <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
+            return allHistory.map((pr) => {
+              const amountUSDC = (Number(pr.amount) / 1e6).toFixed(2);
+              // For "sent" requests: user sent a request (they're the requester), 
+              // when paid, they RECEIVE money (+)
+              // For "received" requests: user received a request (they're the payer),
+              // when paid, they SEND money (-)
+              const balanceChange = pr.direction === "sent" ? `+$${amountUSDC}` : `-$${amountUSDC}`;
+              const balanceColor = pr.direction === "sent" ? "text-green-400" : "text-red-400";
+
+              return (
+                <div key={pr.id} className="list-item">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs ${pr.direction === "sent" ? "text-blue-400" : "text-purple-400"}`}>
+                        {pr.direction === "sent" ? "↑ Sent Request" : "↓ Received Request"}
+                      </span>
+                      <span className="font-medium">{amountUSDC} USDC</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {pr.status === "paid" && (
+                        <span className={`text-xs font-medium ${balanceColor}`}>
+                          {balanceChange}
+                        </span>
+                      )}
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        pr.status === "paid" ? "bg-green-800 text-green-300" :
+                        pr.status === "rejected" ? "bg-orange-800 text-orange-300" :
+                        pr.status === "cancelled" ? "bg-red-800 text-red-300" :
+                        "bg-gray-700 text-gray-300"
+                      }`}>{pr.status}</span>
+                    </div>
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    pr.status === "paid" ? "bg-green-800 text-green-300" :
-                    pr.status === "rejected" ? "bg-orange-800 text-orange-300" :
-                    pr.status === "cancelled" ? "bg-red-800 text-red-300" :
-                    "bg-gray-700 text-gray-300"
-                  }`}>{pr.status}</span>
+                  <p className="text-gray-500 font-mono text-xs mt-1">
+                    {pr.direction === "sent" 
+                      ? `To: ${pr.payer_wallet_address ? `${pr.payer_wallet_address.slice(0, 6)}...${pr.payer_wallet_address.slice(-4)}` : "Unknown"}`
+                      : `From: ${pr.profiles?.wallet_address ? `${pr.profiles.wallet_address.slice(0, 6)}...${pr.profiles.wallet_address.slice(-4)}` : "Unknown"}`
+                    }
+                  </p>
+                  {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
+                  {pr.tx_hash && (
+                    <a 
+                      href={`https://basescan.org/tx/${pr.tx_hash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 text-xs hover:underline"
+                    >
+                      View transaction
+                    </a>
+                  )}
                 </div>
-                <p className="text-gray-500 font-mono text-xs mt-1">
-                  {pr.direction === "sent" 
-                    ? `To: ${pr.payer_wallet_address ? `${pr.payer_wallet_address.slice(0, 6)}...${pr.payer_wallet_address.slice(-4)}` : "Unknown"}`
-                    : `From: ${pr.profiles?.wallet_address ? `${pr.profiles.wallet_address.slice(0, 6)}...${pr.profiles.wallet_address.slice(-4)}` : "Unknown"}`
-                  }
-                </p>
-                {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
-                {pr.tx_hash && (
-                  <a 
-                    href={`https://basescan.org/tx/${pr.tx_hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 text-xs hover:underline"
-                  >
-                    View transaction
-                  </a>
-                )}
-              </div>
-            ));
+              );
+            });
           })()}
         </div>
       )}
