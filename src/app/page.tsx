@@ -395,7 +395,7 @@ export default function Home() {
               isConfirming={isConfirming}
               prefilledContact={requestMoneyContact}
               onPrefilledContactUsed={clearPrefilledContact}
-              onSendMoney={(toAddress, amount, memo, saveAsContact, contactLabel) => sendMoneyFromRequests(toAddress, amount, memo, saveAsContact, contactLabel)}
+              onSendMoney={(toAddress: string, amount: number, memo?: string) => sendMoneyFromRequests(toAddress, amount, memo)}
             />
           )}
         </div>

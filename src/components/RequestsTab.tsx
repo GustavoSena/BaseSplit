@@ -153,6 +153,10 @@ export function RequestsTab({
     const loadFilterPreference = async () => {
       if (!currentWalletAddress) return;
       const result = await getProfileByWallet(currentWalletAddress);
+      if (result.error) {
+        console.error("Failed to load filter preference:", result.error);
+        return;
+      }
       if (result.data?.history_filter_default) {
         setHistoryFilter(result.data.history_filter_default);
       }
@@ -215,24 +219,49 @@ export function RequestsTab({
     if (!currentWalletAddress) return;
     
     setIsCreating(true);
+    setPaymentRequestsError(null);
+    
     try {
       const profileResult = await getProfileIdByWallet(currentWalletAddress);
       if (!profileResult.data) {
-        throw new Error("Profile not found");
+        setPaymentRequestsError("Profile not found. Please sign in again.");
+        return;
       }
+      
+      const results: { address: string; success: boolean; error?: string }[] = [];
       
       for (const recipient of data.recipients) {
-        const amountInMicroUnits = Math.floor(recipient.amount * 1e6);
-        await createPaymentRequestQuery({
-          requesterId: profileResult.data.id,
-          payerWalletAddress: recipient.address,
-          amount: amountInMicroUnits,
-          memo: data.memo || null,
-        });
+        try {
+          const amountInMicroUnits = Math.floor(recipient.amount * 1e6);
+          await createPaymentRequestQuery({
+            requesterId: profileResult.data.id,
+            payerWalletAddress: recipient.address,
+            amount: amountInMicroUnits,
+            memo: data.memo || null,
+          });
+          results.push({ address: recipient.address, success: true });
+        } catch (err) {
+          results.push({ 
+            address: recipient.address, 
+            success: false, 
+            error: err instanceof Error ? err.message : "Unknown error" 
+          });
+        }
       }
       
-      setShowRequestForm(false);
-      await loadPaymentRequests();
+      const failures = results.filter(r => !r.success);
+      if (failures.length > 0) {
+        const failedAddresses = failures.map(f => `${f.address.slice(0, 6)}...`).join(", ");
+        setPaymentRequestsError(`Failed to create ${failures.length} request(s) for: ${failedAddresses}`);
+      }
+      
+      if (results.some(r => r.success)) {
+        await loadPaymentRequests();
+      }
+      
+      if (failures.length === 0) {
+        setShowRequestForm(false);
+      }
     } finally {
       setIsCreating(false);
     }
