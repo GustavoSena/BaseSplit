@@ -123,6 +123,7 @@ create table if not exists public.payment_requests (
 create index if not exists payment_requests_requester_id_idx on public.payment_requests (requester_id);
 create index if not exists payment_requests_payer_wallet_idx on public.payment_requests (payer_wallet_address);
 create index if not exists payment_requests_status_idx on public.payment_requests (status);
+create index if not exists payment_requests_type_idx on public.payment_requests (type);
 
 alter table public.payment_requests enable row level security;
 

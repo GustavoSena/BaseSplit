@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Contact } from "@/lib/supabase/queries";
+
+// Validate Ethereum address format (0x followed by 40 hex characters)
+function isValidEthereumAddress(address: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
+}
 
 interface MoneyTransferFormProps {
   mode: "request" | "send";
@@ -37,6 +42,22 @@ export function MoneyTransferForm({
   const [showContactDropdown, setShowContactDropdown] = useState(false);
   const [saveNewContact, setSaveNewContact] = useState(false);
   const [newContactLabel, setNewContactLabel] = useState("");
+  
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowContactDropdown(false);
+      }
+    };
+    
+    if (showContactDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showContactDropdown]);
 
   const handleAddressChange = useCallback((value: string) => {
     setContactSearch(value);
@@ -94,13 +115,14 @@ export function MoneyTransferForm({
     ? (isSubmitting ? "Creating..." : "Create Request")
     : (isSubmitting ? "Sending..." : isConfirming ? "Confirming..." : "Send Money");
   const buttonClass = mode === "request" ? "btn-primary" : "btn-success";
-  const isDisabled = isSubmitting || isConfirming || !address || !amount || (saveNewContact && !newContactLabel.trim());
+  const isValidAddress = isValidEthereumAddress(address);
+  const isDisabled = isSubmitting || isConfirming || !isValidAddress || !amount || (saveNewContact && !newContactLabel.trim());
 
   return (
     <div className="card">
       <p className="card-title">{title}</p>
       
-      <div className="relative">
+      <div className="relative" ref={dropdownRef}>
         <input
           type="text"
           placeholder="Search contacts or enter wallet address..."
@@ -137,8 +159,8 @@ export function MoneyTransferForm({
       </div>
       
       {address && (
-        <p className="text-xs text-gray-500 font-mono truncate">
-          To: {address}
+        <p className={`text-xs font-mono truncate ${isValidAddress ? "text-gray-500" : "text-yellow-500"}`}>
+          To: {address} {!isValidAddress && "(invalid address format)"}
         </p>
       )}
       

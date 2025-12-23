@@ -145,6 +145,7 @@ export async function deleteContact(contactId: string): Promise<QueryResult<null
 
 /**
  * Fetches payment requests where the specified wallet is the payer.
+ * Only returns records of type 'request' (not direct transfers).
  *
  * @param payerWalletAddress - Wallet address of the payer; lookup is performed using the lowercased address.
  * @returns The matching payment requests, each including the requester's profile `wallet_address` when available; returns an empty array if no requests are found.
@@ -154,6 +155,7 @@ export async function getIncomingPaymentRequests(payerWalletAddress: string): Pr
     .from("payment_requests")
     .select("*, profiles!requester_id(wallet_address)")
     .eq("payer_wallet_address", payerWalletAddress.toLowerCase())
+    .eq("type", "request")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -162,11 +164,16 @@ export async function getIncomingPaymentRequests(payerWalletAddress: string): Pr
   return { data: data || [], error: null };
 }
 
+/**
+ * Fetches payment requests sent by the specified requester.
+ * Only returns records of type 'request' (not direct transfers).
+ */
 export async function getSentPaymentRequests(requesterId: string): Promise<QueryResult<PaymentRequest[]>> {
   const { data, error } = await supabase
     .from("payment_requests")
     .select("*, profiles!requester_id(wallet_address)")
     .eq("requester_id", requesterId)
+    .eq("type", "request")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -175,6 +182,51 @@ export async function getSentPaymentRequests(requesterId: string): Promise<Query
   return { data: data || [], error: null };
 }
 
+/**
+ * Fetches direct transfers sent by the specified sender.
+ * Only returns records of type 'transfer'.
+ */
+export async function getSentTransfers(senderId: string): Promise<QueryResult<PaymentRequest[]>> {
+  const { data, error } = await supabase
+    .from("payment_requests")
+    .select("*, profiles!requester_id(wallet_address)")
+    .eq("requester_id", senderId)
+    .eq("type", "transfer")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return { data: null, error: error.message, errorCode: error.code };
+  }
+  return { data: data || [], error: null };
+}
+
+/**
+ * Fetches direct transfers received by the specified wallet.
+ * Only returns records of type 'transfer'.
+ */
+export async function getReceivedTransfers(recipientWalletAddress: string): Promise<QueryResult<PaymentRequest[]>> {
+  const { data, error } = await supabase
+    .from("payment_requests")
+    .select("*, profiles!requester_id(wallet_address)")
+    .eq("payer_wallet_address", recipientWalletAddress.toLowerCase())
+    .eq("type", "transfer")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return { data: null, error: error.message, errorCode: error.code };
+  }
+  return { data: data || [], error: null };
+}
+
+/**
+ * Creates a new payment request record.
+ *
+ * @param params.requesterId - The ID of the requester.
+ * @param params.payerWalletAddress - The wallet address of the payer; it will be lowercased before storage.
+ * @param params.amount - The amount of the payment request.
+ * @param params.memo - Optional memo for the payment request; `null` will be stored when omitted.
+ * @returns The inserted payment request record in `data` on success; on failure `data` is `null` and `error` and `errorCode` contain the error message and code.
+ */
 export async function createPaymentRequest(params: {
   requesterId: string;
   payerWalletAddress: string;

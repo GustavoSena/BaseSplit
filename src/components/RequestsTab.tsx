@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { base } from "viem/chains";
 import { Name } from "@coinbase/onchainkit/identity";
 import { RefreshIcon, ChevronDownIcon } from "./Icons";
+import { BillSplitForm } from "./BillSplitForm";
+import { MultiSendForm } from "./MultiSendForm";
 import {
   Contact,
   PaymentRequest,
@@ -29,6 +31,7 @@ interface RequestsTabProps {
   prefilledContact?: Contact | null;
   onPrefilledContactUsed?: () => void;
   onSendMoney?: (toAddress: string, amount: number, memo?: string, saveAsContact?: boolean, contactLabel?: string) => void;
+  onMultiSend?: (recipients: { address: string; amount: number }[], memo?: string) => void;
 }
 
 /**
@@ -156,6 +159,8 @@ export function RequestsTab({
   // Form state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showSendForm, setShowSendForm] = useState(false);
+  const [showSplitForm, setShowSplitForm] = useState(false);
+  const [showMultiSendForm, setShowMultiSendForm] = useState(false);
   const [newPayerAddress, setNewPayerAddress] = useState("");
   const [newAmount, setNewAmount] = useState("");
   const [newMemo, setNewMemo] = useState("");
@@ -171,7 +176,6 @@ export function RequestsTab({
   const [saveNewContact, setSaveNewContact] = useState(false);
   const [newContactLabel, setNewContactLabel] = useState("");
 
-  // Handle prefilled contact from Contacts tab "Request Money" button
   useEffect(() => {
     if (prefilledContact) {
       setNewPayerAddress(prefilledContact.contact_wallet_address);
@@ -377,13 +381,15 @@ export function RequestsTab({
 
   return (
     <>
-      {/* Header with Request, Send, and Refresh */}
-      <div className="flex gap-2">
+      {/* Header with Request, Send, Split, Multi-Send, and Refresh */}
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={() => {
             const newState = !showCreateForm;
             setShowCreateForm(newState);
             setShowSendForm(false);
+            setShowSplitForm(false);
+            setShowMultiSendForm(false);
             if (newState) {
               loadContacts();
             } else {
@@ -396,7 +402,7 @@ export function RequestsTab({
               setNewContactLabel("");
             }
           }}
-          className={`flex-1 ${showCreateForm ? "btn-secondary" : "btn-success"}`}
+          className={`flex-1 min-w-[70px] ${showCreateForm ? "btn-secondary" : "btn-success"}`}
         >
           {showCreateForm ? "Cancel" : "Request"}
         </button>
@@ -405,6 +411,8 @@ export function RequestsTab({
             const newState = !showSendForm;
             setShowSendForm(newState);
             setShowCreateForm(false);
+            setShowSplitForm(false);
+            setShowMultiSendForm(false);
             if (newState) {
               loadContacts();
             } else {
@@ -417,9 +425,35 @@ export function RequestsTab({
               setNewContactLabel("");
             }
           }}
-          className={`flex-1 ${showSendForm ? "btn-secondary" : "btn-primary"}`}
+          className={`flex-1 min-w-[70px] ${showSendForm ? "btn-secondary" : "btn-primary"}`}
         >
           {showSendForm ? "Cancel" : "Send"}
+        </button>
+        <button
+          onClick={() => {
+            const newState = !showSplitForm;
+            setShowSplitForm(newState);
+            setShowCreateForm(false);
+            setShowSendForm(false);
+            setShowMultiSendForm(false);
+            if (newState) loadContacts();
+          }}
+          className={`flex-1 min-w-[70px] ${showSplitForm ? "btn-secondary" : "btn-primary"}`}
+        >
+          {showSplitForm ? "Cancel" : "Split"}
+        </button>
+        <button
+          onClick={() => {
+            const newState = !showMultiSendForm;
+            setShowMultiSendForm(newState);
+            setShowCreateForm(false);
+            setShowSendForm(false);
+            setShowSplitForm(false);
+            if (newState) loadContacts();
+          }}
+          className={`flex-1 min-w-[70px] ${showMultiSendForm ? "btn-secondary" : "btn-primary"}`}
+        >
+          {showMultiSendForm ? "Cancel" : "Multi"}
         </button>
         <button
           onClick={() => loadPaymentRequests(true)}
@@ -677,6 +711,51 @@ export function RequestsTab({
             {isSending ? "Sending..." : isConfirming ? "Confirming..." : "Send Money"}
           </button>
         </div>
+      )}
+
+      {/* Bill Split Form */}
+      {showSplitForm && currentWalletAddress && (
+        <BillSplitForm
+          contacts={contacts}
+          currentWalletAddress={currentWalletAddress}
+          onSubmit={async ({ participants, memo }) => {
+            const profileResult = await getProfileIdByWallet(currentWalletAddress);
+            if (!profileResult.data) {
+              throw new Error("Profile not found");
+            }
+            
+            for (const p of participants) {
+              const amountInMicroUnits = Math.floor(p.amount * 1e6);
+              await createPaymentRequestQuery({
+                requesterId: profileResult.data.id,
+                payerWalletAddress: p.address,
+                amount: amountInMicroUnits,
+                memo: memo || null,
+              });
+            }
+            
+            setShowSplitForm(false);
+            await loadPaymentRequests();
+          }}
+          isSubmitting={isCreating}
+          onCancel={() => setShowSplitForm(false)}
+        />
+      )}
+
+      {/* Multi-Send Form */}
+      {showMultiSendForm && onSendMoney && (
+        <MultiSendForm
+          contacts={contacts}
+          onSubmit={async ({ recipients, memo }) => {
+            for (const r of recipients) {
+              onSendMoney(r.address, r.amount, memo);
+            }
+            setShowMultiSendForm(false);
+          }}
+          isSubmitting={isSending}
+          isConfirming={isConfirming}
+          onCancel={() => setShowMultiSendForm(false)}
+        />
       )}
 
       {paymentRequestsError && (

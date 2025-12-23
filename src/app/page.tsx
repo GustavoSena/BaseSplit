@@ -90,6 +90,7 @@ export default function Home() {
     contactLabel?: string;
   } | null>(null);
   const pendingTransferRef = useRef<typeof pendingTransfer>(null);
+  const isRecordingTransferRef = useRef(false); // Guard against duplicate recording in strict mode
   
   // Tab state
   const [activeTab, setActiveTab] = useState<"requests" | "contacts" | "settings">("requests");
@@ -267,6 +268,10 @@ export default function Home() {
       const transfer = pendingTransferRef.current || pendingTransfer;
       if (!isConfirmed || !txHash || !transfer || !currentWalletAddress) return;
       
+      // Guard against duplicate recording in React Strict Mode
+      if (isRecordingTransferRef.current) return;
+      isRecordingTransferRef.current = true;
+      
       try {
         const profileResult = await getProfileIdByWallet(currentWalletAddress);
         if (profileResult.data) {
@@ -295,6 +300,7 @@ export default function Home() {
       
       setPendingTransfer(null);
       pendingTransferRef.current = null;
+      isRecordingTransferRef.current = false;
       refetchBalance();
     };
     
