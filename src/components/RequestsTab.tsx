@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { base } from "viem/chains";
 import { Name } from "@coinbase/onchainkit/identity";
 import { RefreshIcon, ChevronDownIcon } from "./Icons";
-import { BillSplitForm } from "./BillSplitForm";
-import { MultiSendForm } from "./MultiSendForm";
+import { MultiRecipientForm } from "./MultiRecipientForm";
 import {
   Contact,
   PaymentRequest,
@@ -30,22 +29,9 @@ interface RequestsTabProps {
   isConfirming: boolean;
   prefilledContact?: Contact | null;
   onPrefilledContactUsed?: () => void;
-  onSendMoney?: (toAddress: string, amount: number, memo?: string, saveAsContact?: boolean, contactLabel?: string) => void;
-  onMultiSend?: (recipients: { address: string; amount: number }[], memo?: string) => void;
+  onSendMoney?: (toAddress: string, amount: number, memo?: string) => void;
 }
 
-/**
- * Manage and load incoming and sent payment requests for the specified wallet address.
- *
- * @param currentWalletAddress - The wallet address whose payment requests should be loaded; pass `null` to disable loading.
- * @returns An object with the current request state and actions:
- * - `paymentRequests`: array of incoming `PaymentRequest` items for the current wallet.
- * - `sentRequests`: array of `PaymentRequest` items created by the profile that owns the current wallet.
- * - `paymentRequestsError`: an error message string when loading fails, or `null` when no error.
- * - `setPaymentRequestsError`: setter for `paymentRequestsError`.
- * - `isRefreshing`: `true` when a manual refresh indicator is shown.
- * - `loadPaymentRequests`: function to reload requests; accepts an optional `showRefreshIndicator: boolean` to display the refresh indicator during the load.
- */
 export function usePaymentRequests(currentWalletAddress: string | null) {
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<PaymentRequest[]>([]);
@@ -95,7 +81,6 @@ export function usePaymentRequests(currentWalletAddress: string | null) {
     }
   }, [currentWalletAddress, loadPaymentRequests]);
 
-  // Periodic refresh every 30 seconds
   useEffect(() => {
     if (!currentWalletAddress) return;
     
@@ -118,23 +103,6 @@ export function usePaymentRequests(currentWalletAddress: string | null) {
   };
 }
 
-/**
- * Render the Requests tab UI for creating, listing, and managing payment requests.
- *
- * Provides controls to create a new payment request, refresh and view incoming/sent pending requests,
- * save requesters as contacts, cancel or reject requests, and browse completed request history with filters.
- *
- * @param currentWalletAddress - The currently connected wallet address, or `null` if not connected.
- * @param contacts - List of saved contacts used to autofill payer addresses and filter history.
- * @param loadContacts - Callback to reload contacts after creating or saving a contact.
- * @param payPaymentRequest - Callback invoked to initiate payment for a given payment request.
- * @param payingRequestId - ID of the request currently being paid, used to show progress state.
- * @param isSending - True while a send transaction is being submitted.
- * @param isConfirming - True while a send transaction is awaiting confirmation.
- * @param prefilledContact - Optional contact provided by other UI to prefill the create-request form.
- * @param onPrefilledContactUsed - Optional callback invoked when a `prefilledContact` has been applied.
- * @returns The rendered Requests tab as a JSX element.
- */
 export function RequestsTab({
   currentWalletAddress,
   contacts,
@@ -156,36 +124,31 @@ export function RequestsTab({
     loadPaymentRequests,
   } = usePaymentRequests(currentWalletAddress);
 
-  // Form state
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  // Form visibility state
+  const [showRequestForm, setShowRequestForm] = useState(false);
   const [showSendForm, setShowSendForm] = useState(false);
-  const [showSplitForm, setShowSplitForm] = useState(false);
-  const [showMultiSendForm, setShowMultiSendForm] = useState(false);
-  const [newPayerAddress, setNewPayerAddress] = useState("");
-  const [newAmount, setNewAmount] = useState("");
-  const [newMemo, setNewMemo] = useState("");
-  const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [contactSearch, setContactSearch] = useState("");
-  const [showContactDropdown, setShowContactDropdown] = useState(false);
+  
+  // History state
   const [showHistory, setShowHistory] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilterType>("all");
-  const [isFilterLoaded, setIsFilterLoaded] = useState(false);
-  
-  // Save as contact state for request/send forms
-  const [saveNewContact, setSaveNewContact] = useState(false);
-  const [newContactLabel, setNewContactLabel] = useState("");
 
+  // Save as contact state (for pending requests)
+  const [saveAsContactId, setSaveAsContactId] = useState<string | null>(null);
+  const [saveAsContactLabel, setSaveAsContactLabel] = useState("");
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [saveContactError, setSaveContactError] = useState<string | null>(null);
+
+  // Handle prefilled contact
   useEffect(() => {
     if (prefilledContact) {
-      setNewPayerAddress(prefilledContact.contact_wallet_address);
-      setContactSearch(prefilledContact.label);
-      setShowCreateForm(true);
+      setShowRequestForm(true);
+      loadContacts();
       onPrefilledContactUsed?.();
     }
-  }, [prefilledContact, onPrefilledContactUsed]);
+  }, [prefilledContact, onPrefilledContactUsed, loadContacts]);
 
-  // Load user's filter preference from profile
+  // Load user's filter preference
   useEffect(() => {
     const loadFilterPreference = async () => {
       if (!currentWalletAddress) return;
@@ -193,12 +156,10 @@ export function RequestsTab({
       if (result.data?.history_filter_default) {
         setHistoryFilter(result.data.history_filter_default);
       }
-      setIsFilterLoaded(true);
     };
     loadFilterPreference();
   }, [currentWalletAddress]);
 
-  // Save filter preference when changed
   const handleFilterChange = async (newFilter: HistoryFilterType) => {
     const previousFilter = historyFilter;
     setHistoryFilter(newFilter);
@@ -208,24 +169,16 @@ export function RequestsTab({
         filterType: newFilter,
       });
       if (result.error) {
-        // Revert to previous filter if persistence failed
         setHistoryFilter(previousFilter);
         console.error("Failed to save filter preference:", result.error);
       }
     }
   };
 
-  // Helper to check if an address is a contact
   const isContact = useCallback((address: string | undefined) => {
     if (!address) return false;
     return contacts.some(c => c.contact_wallet_address.toLowerCase() === address.toLowerCase());
   }, [contacts]);
-
-  // Save as contact state (for issue #12)
-  const [saveAsContactId, setSaveAsContactId] = useState<string | null>(null);
-  const [saveAsContactLabel, setSaveAsContactLabel] = useState("");
-  const [isSavingContact, setIsSavingContact] = useState(false);
-  const [saveContactError, setSaveContactError] = useState<string | null>(null);
 
   const handleSaveAsContact = async (walletAddress: string) => {
     if (!currentWalletAddress || !saveAsContactLabel.trim()) return;
@@ -257,92 +210,42 @@ export function RequestsTab({
     }
   };
 
-  const createPaymentRequest = async () => {
-    if (!currentWalletAddress || !newPayerAddress || !newAmount) return;
-    
-    const amount = parseFloat(newAmount);
-    if (isNaN(amount) || amount < 0.01) {
-      setCreateError("Minimum amount is $0.01 USDC");
-      return;
-    }
-    if (amount > 10000) {
-      setCreateError("Maximum amount is $10,000 USDC");
-      return;
-    }
+  // Handle request form submission
+  const handleRequestSubmit = async (data: { recipients: { address: string; amount: number }[]; memo?: string }) => {
+    if (!currentWalletAddress) return;
     
     setIsCreating(true);
-    setCreateError(null);
-    
     try {
       const profileResult = await getProfileIdByWallet(currentWalletAddress);
       if (!profileResult.data) {
-        throw new Error("Profile not found. Please sign in again.");
+        throw new Error("Profile not found");
       }
       
-      const amountInMicroUnits = Math.floor(amount * 1e6);
-      
-      const result = await createPaymentRequestQuery({
-        requesterId: profileResult.data.id,
-        payerWalletAddress: newPayerAddress,
-        amount: amountInMicroUnits,
-        memo: newMemo || null,
-      });
-      
-      if (result.error) throw new Error(result.error);
-      
-      // Save as contact if checkbox was checked and address is not already a contact
-      if (saveNewContact && newContactLabel.trim() && !isContact(newPayerAddress)) {
-        await createContact({
-          ownerId: profileResult.data.id,
-          contactWalletAddress: newPayerAddress,
-          label: newContactLabel.trim(),
+      for (const recipient of data.recipients) {
+        const amountInMicroUnits = Math.floor(recipient.amount * 1e6);
+        await createPaymentRequestQuery({
+          requesterId: profileResult.data.id,
+          payerWalletAddress: recipient.address,
+          amount: amountInMicroUnits,
+          memo: data.memo || null,
         });
-        loadContacts();
       }
       
-      setNewPayerAddress("");
-      setNewAmount("");
-      setNewMemo("");
-      setContactSearch("");
-      setShowContactDropdown(false);
-      setShowCreateForm(false);
-      setSaveNewContact(false);
-      setNewContactLabel("");
+      setShowRequestForm(false);
       await loadPaymentRequests();
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Failed to create payment request");
     } finally {
       setIsCreating(false);
     }
   };
 
-  // Handle sending money directly
-  const handleSendMoney = () => {
-    if (!currentWalletAddress || !newPayerAddress || !newAmount || !onSendMoney) return;
+  // Handle send form submission
+  const handleSendSubmit = async (data: { recipients: { address: string; amount: number }[]; memo?: string }) => {
+    if (!onSendMoney) return;
     
-    const trimmedAmount = newAmount.trim();
-    if (!trimmedAmount) {
-      setCreateError("Please enter an amount");
-      return;
+    for (const recipient of data.recipients) {
+      onSendMoney(recipient.address, recipient.amount, data.memo);
     }
-    const amount = parseFloat(trimmedAmount);
-    if (isNaN(amount) || amount < 0.01) {
-      setCreateError("Minimum amount is $0.01 USDC");
-      return;
-    }
-    if (amount > 10000) {
-      setCreateError("Maximum amount is $10,000 USDC");
-      return;
-    }
-    
-    setCreateError(null);
-    onSendMoney(
-      newPayerAddress, 
-      amount, 
-      newMemo || undefined,
-      saveNewContact && !isContact(newPayerAddress) ? true : undefined,
-      saveNewContact ? newContactLabel.trim() : undefined
-    );
+    setShowSendForm(false);
   };
 
   const cancelRequest = async (requestId: string, action: "reject" | "cancel") => {
@@ -381,79 +284,27 @@ export function RequestsTab({
 
   return (
     <>
-      {/* Header with Request, Send, Split, Multi-Send, and Refresh */}
-      <div className="flex flex-wrap gap-2">
+      {/* Header with Request, Send, and Refresh */}
+      <div className="flex gap-2">
         <button
           onClick={() => {
-            const newState = !showCreateForm;
-            setShowCreateForm(newState);
+            setShowRequestForm(!showRequestForm);
             setShowSendForm(false);
-            setShowSplitForm(false);
-            setShowMultiSendForm(false);
-            if (newState) {
-              loadContacts();
-            } else {
-              setContactSearch("");
-              setShowContactDropdown(false);
-              setNewPayerAddress("");
-              setNewAmount("");
-              setNewMemo("");
-              setSaveNewContact(false);
-              setNewContactLabel("");
-            }
+            if (!showRequestForm) loadContacts();
           }}
-          className={`flex-1 min-w-[70px] ${showCreateForm ? "btn-secondary" : "btn-success"}`}
+          className={`flex-1 ${showRequestForm ? "btn-secondary" : "btn-success"}`}
         >
-          {showCreateForm ? "Cancel" : "Request"}
+          {showRequestForm ? "Cancel" : "Request"}
         </button>
         <button
           onClick={() => {
-            const newState = !showSendForm;
-            setShowSendForm(newState);
-            setShowCreateForm(false);
-            setShowSplitForm(false);
-            setShowMultiSendForm(false);
-            if (newState) {
-              loadContacts();
-            } else {
-              setContactSearch("");
-              setShowContactDropdown(false);
-              setNewPayerAddress("");
-              setNewAmount("");
-              setNewMemo("");
-              setSaveNewContact(false);
-              setNewContactLabel("");
-            }
+            setShowSendForm(!showSendForm);
+            setShowRequestForm(false);
+            if (!showSendForm) loadContacts();
           }}
-          className={`flex-1 min-w-[70px] ${showSendForm ? "btn-secondary" : "btn-primary"}`}
+          className={`flex-1 ${showSendForm ? "btn-secondary" : "btn-primary"}`}
         >
           {showSendForm ? "Cancel" : "Send"}
-        </button>
-        <button
-          onClick={() => {
-            const newState = !showSplitForm;
-            setShowSplitForm(newState);
-            setShowCreateForm(false);
-            setShowSendForm(false);
-            setShowMultiSendForm(false);
-            if (newState) loadContacts();
-          }}
-          className={`flex-1 min-w-[70px] ${showSplitForm ? "btn-secondary" : "btn-primary"}`}
-        >
-          {showSplitForm ? "Cancel" : "Split"}
-        </button>
-        <button
-          onClick={() => {
-            const newState = !showMultiSendForm;
-            setShowMultiSendForm(newState);
-            setShowCreateForm(false);
-            setShowSendForm(false);
-            setShowSplitForm(false);
-            if (newState) loadContacts();
-          }}
-          className={`flex-1 min-w-[70px] ${showMultiSendForm ? "btn-secondary" : "btn-primary"}`}
-        >
-          {showMultiSendForm ? "Cancel" : "Multi"}
         </button>
         <button
           onClick={() => loadPaymentRequests(true)}
@@ -465,296 +316,26 @@ export function RequestsTab({
         </button>
       </div>
 
-      {/* Create Payment Request Form */}
-      {showCreateForm && (
-        <div className="card">
-          <p className="card-title">New Payment Request</p>
-          
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search contacts or enter wallet address..."
-              value={contactSearch}
-              onChange={(e) => {
-                const value = e.target.value;
-                setContactSearch(value);
-                if (value === "") {
-                  setNewPayerAddress("");
-                  setShowContactDropdown(contacts.length > 0);
-                } else if (value.startsWith("0x")) {
-                  setNewPayerAddress(value);
-                  setShowContactDropdown(false);
-                } else {
-                  setShowContactDropdown(contacts.length > 0);
-                }
-              }}
-              onFocus={() => {
-                if (contacts.length > 0 && !contactSearch.startsWith("0x")) {
-                  setShowContactDropdown(true);
-                }
-              }}
-              className="input"
-            />
-            
-            {showContactDropdown && contacts.length > 0 && (() => {
-              const filteredContacts = contacts.filter(c => 
-                contactSearch === "" ||
-                c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
-                c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
-              );
-              return (
-                <div className="dropdown">
-                  {filteredContacts.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        setNewPayerAddress(c.contact_wallet_address);
-                        setContactSearch(c.label);
-                        setShowContactDropdown(false);
-                      }}
-                      className="dropdown-item flex justify-between items-center"
-                    >
-                      <span className="font-medium">{c.label}</span>
-                      <span className="text-gray-500 text-xs font-mono truncate ml-2">
-                        {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
-                      </span>
-                    </button>
-                  ))}
-                  {filteredContacts.length === 0 && (
-                    <p className="px-3 py-2 text-gray-500 text-sm">No matching contacts</p>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-          
-          {newPayerAddress && (
-            <p className="text-xs text-gray-500 font-mono truncate">
-              To: {newPayerAddress}
-            </p>
-          )}
-          
-          <input
-            type="number"
-            placeholder="Amount (USDC)"
-            value={newAmount}
-            onChange={(e) => setNewAmount(e.target.value)}
-            step="0.01"
-            min="0"
-            className="input"
-          />
-          <input
-            type="text"
-            placeholder="Memo (optional)"
-            value={newMemo}
-            onChange={(e) => setNewMemo(e.target.value)}
-            className="input"
-          />
-          
-          {/* Save as contact option - show only if address is not already a contact */}
-          {newPayerAddress && !isContact(newPayerAddress) && (
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={saveNewContact}
-                  onChange={(e) => setSaveNewContact(e.target.checked)}
-                  className="rounded border-gray-600 bg-gray-700 text-blue-500"
-                />
-                Save as contact
-              </label>
-              {saveNewContact && (
-                <input
-                  type="text"
-                  placeholder="Contact name (e.g., Alice)"
-                  value={newContactLabel}
-                  onChange={(e) => setNewContactLabel(e.target.value)}
-                  className="input text-sm"
-                />
-              )}
-            </div>
-          )}
-          
-          {createError && (
-            <p className="text-error">{createError}</p>
-          )}
-          <button
-            onClick={createPaymentRequest}
-            disabled={isCreating || !newPayerAddress || !newAmount || (saveNewContact && !newContactLabel.trim())}
-            className="w-full btn-primary"
-          >
-            {isCreating ? "Creating..." : "Create Request"}
-          </button>
-        </div>
-      )}
-
-      {/* Send Money Form */}
-      {showSendForm && (
-        <div className="card">
-          <p className="card-title">Send Money</p>
-          
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search contacts or enter wallet address..."
-              value={contactSearch}
-              onChange={(e) => {
-                const value = e.target.value;
-                setContactSearch(value);
-                if (value === "") {
-                  setNewPayerAddress("");
-                  setShowContactDropdown(contacts.length > 0);
-                } else if (value.startsWith("0x")) {
-                  setNewPayerAddress(value);
-                  setShowContactDropdown(false);
-                } else {
-                  setShowContactDropdown(contacts.length > 0);
-                }
-              }}
-              onFocus={() => {
-                if (contacts.length > 0 && !contactSearch.startsWith("0x")) {
-                  setShowContactDropdown(true);
-                }
-              }}
-              className="input"
-            />
-            
-            {showContactDropdown && contacts.length > 0 && (() => {
-              const filteredContacts = contacts.filter(c => 
-                contactSearch === "" ||
-                c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
-                c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
-              );
-              return (
-                <div className="dropdown">
-                  {filteredContacts.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        setNewPayerAddress(c.contact_wallet_address);
-                        setContactSearch(c.label);
-                        setShowContactDropdown(false);
-                      }}
-                      className="dropdown-item flex justify-between items-center"
-                    >
-                      <span className="font-medium">{c.label}</span>
-                      <span className="text-gray-500 text-xs font-mono truncate ml-2">
-                        {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
-                      </span>
-                    </button>
-                  ))}
-                  {filteredContacts.length === 0 && (
-                    <p className="px-3 py-2 text-gray-500 text-sm">No matching contacts</p>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-          
-          {newPayerAddress && (
-            <p className="text-xs text-gray-500 font-mono truncate">
-              To: {newPayerAddress}
-            </p>
-          )}
-          
-          <input
-            type="number"
-            placeholder="Amount (USDC)"
-            value={newAmount}
-            onChange={(e) => setNewAmount(e.target.value)}
-            step="0.01"
-            min="0"
-            className="input"
-          />
-          <input
-            type="text"
-            placeholder="Memo (optional)"
-            value={newMemo}
-            onChange={(e) => setNewMemo(e.target.value)}
-            className="input"
-          />
-          
-          {/* Save as contact option - show only if address is not already a contact */}
-          {newPayerAddress && !isContact(newPayerAddress) && (
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={saveNewContact}
-                  onChange={(e) => setSaveNewContact(e.target.checked)}
-                  className="rounded border-gray-600 bg-gray-700 text-blue-500"
-                />
-                Save as contact
-              </label>
-              {saveNewContact && (
-                <input
-                  type="text"
-                  placeholder="Contact name (e.g., Alice)"
-                  value={newContactLabel}
-                  onChange={(e) => setNewContactLabel(e.target.value)}
-                  className="input text-sm"
-                />
-              )}
-            </div>
-          )}
-          
-          {createError && (
-            <p className="text-error">{createError}</p>
-          )}
-          <button
-            onClick={handleSendMoney}
-            disabled={isSending || isConfirming || !newPayerAddress || !newAmount || (saveNewContact && !newContactLabel.trim())}
-            className="w-full btn-success"
-          >
-            {isSending ? "Sending..." : isConfirming ? "Confirming..." : "Send Money"}
-          </button>
-        </div>
-      )}
-
-      {/* Bill Split Form */}
-      {showSplitForm && currentWalletAddress && (
-        <BillSplitForm
+      {/* Request Money Form */}
+      {showRequestForm && (
+        <MultiRecipientForm
+          mode="request"
           contacts={contacts}
-          currentWalletAddress={currentWalletAddress}
-          onSubmit={async ({ participants, memo }) => {
-            const profileResult = await getProfileIdByWallet(currentWalletAddress);
-            if (!profileResult.data) {
-              throw new Error("Profile not found");
-            }
-            
-            for (const p of participants) {
-              const amountInMicroUnits = Math.floor(p.amount * 1e6);
-              await createPaymentRequestQuery({
-                requesterId: profileResult.data.id,
-                payerWalletAddress: p.address,
-                amount: amountInMicroUnits,
-                memo: memo || null,
-              });
-            }
-            
-            setShowSplitForm(false);
-            await loadPaymentRequests();
-          }}
+          onSubmit={handleRequestSubmit}
           isSubmitting={isCreating}
-          onCancel={() => setShowSplitForm(false)}
+          onCancel={() => setShowRequestForm(false)}
         />
       )}
 
-      {/* Multi-Send Form */}
-      {showMultiSendForm && onSendMoney && (
-        <MultiSendForm
+      {/* Send Money Form */}
+      {showSendForm && onSendMoney && (
+        <MultiRecipientForm
+          mode="send"
           contacts={contacts}
-          onSubmit={async ({ recipients, memo }) => {
-            for (const r of recipients) {
-              onSendMoney(r.address, r.amount, memo);
-            }
-            setShowMultiSendForm(false);
-          }}
+          onSubmit={handleSendSubmit}
           isSubmitting={isSending}
           isConfirming={isConfirming}
-          onCancel={() => setShowMultiSendForm(false)}
+          onCancel={() => setShowSendForm(false)}
         />
       )}
 
@@ -804,7 +385,7 @@ export function RequestsTab({
                   </div>
                 )}
                 
-                {/* Save as Contact option - show if requester is not already a contact */}
+                {/* Save as Contact option */}
                 {pr.profiles?.wallet_address && !isContact(pr.profiles.wallet_address) && (
                   <>
                     {saveAsContactId === pr.id ? (
@@ -927,7 +508,6 @@ export function RequestsTab({
                 return true;
               })
               .filter(pr => {
-                // Apply contact filter
                 if (historyFilter === "all") return true;
                 const otherAddress = pr.direction === "sent" 
                   ? pr.payer_wallet_address 
@@ -949,11 +529,6 @@ export function RequestsTab({
 
             return allHistory.map((pr) => {
               const amountUSDC = (Number(pr.amount) / 1e6).toFixed(2);
-              // Balance change indicator:
-              // - "sent" = user CREATED the request (requesting payment FROM someone else)
-              //   → When paid, user's balance INCREASES (+) because they received money
-              // - "received" = user was ASKED to pay (someone requested payment FROM user)
-              //   → When paid, user's balance DECREASES (-) because they sent money
               const balanceChange = pr.direction === "sent" ? `+$${amountUSDC}` : `-$${amountUSDC}`;
               const balanceColor = pr.direction === "sent" ? "text-green-400" : "text-red-400";
 
