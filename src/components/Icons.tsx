@@ -90,10 +90,78 @@ export function SpinnerIcon({ size = "md", className = "", ...props }: IconProps
   );
 }
 
+/**
+ * Renders an external-link SVG icon.
+ *
+ * @param size - One of `"sm" | "md" | "lg"`; controls the icon's rendered width and height (default: `"sm"`).
+ * @param className - Additional CSS classes to apply to the SVG element.
+ * @returns The SVG element representing an external-link icon.
+ */
 export function ExternalLinkIcon({ size = "sm", className = "", ...props }: IconProps) {
   return (
     <Icon size={size} className={className} {...props}>
       <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+    </Icon>
+  );
+}
+
+/**
+ * Renders a trash/delete SVG icon.
+ *
+ * @param size - Icon size ("sm" | "md" | "lg"); defaults to "sm".
+ * @param className - Additional CSS classes applied to the SVG root.
+ * @returns The rendered trash icon SVG element.
+ */
+export function TrashIcon({ size = "sm", className = "", ...props }: IconProps) {
+  return (
+    <Icon size={size} className={className} {...props}>
+      <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </Icon>
+  );
+}
+
+/**
+ * Renders a send (paper-plane) SVG icon.
+ *
+ * @param size - Icon size variant; one of "sm", "md", or "lg" (defaults to "sm")
+ * @param className - Additional CSS classes applied to the SVG element
+ * @returns A JSX element containing the send icon SVG
+ */
+export function SendIcon({ size = "sm", className = "", ...props }: IconProps) {
+  return (
+    <Icon size={size} className={className} {...props}>
+      <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+    </Icon>
+  );
+}
+
+/**
+ * Renders a circular request icon with a centered vertical line.
+ *
+ * @param size - Icon size variant; controls the rendered width/height (defaults to "sm")
+ * @param className - Additional CSS classes to apply to the SVG; merged with size-derived classes
+ * @returns The SVG element for the request icon
+ */
+export function RequestIcon({ size = "sm", className = "", ...props }: IconProps) {
+  return (
+    <Icon size={size} className={className} {...props}>
+      <path d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <path d="M12 9v6" />
+    </Icon>
+  );
+}
+
+/**
+ * Renders a plus (+) icon.
+ *
+ * @param size - Controls the icon's size; one of "sm", "md", or "lg"
+ * @param className - Additional CSS classes to apply to the SVG element
+ * @returns An SVG element depicting a plus symbol
+ */
+export function PlusIcon({ size = "sm", className = "", ...props }: IconProps) {
+  return (
+    <Icon size={size} className={className} {...props}>
+      <path d="M12 4v16m8-8H4" />
     </Icon>
   );
 }

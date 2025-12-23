@@ -4,14 +4,19 @@ import { useState, useEffect, useCallback } from "react";
 import { base } from "viem/chains";
 import { Name } from "@coinbase/onchainkit/identity";
 import { RefreshIcon, ChevronDownIcon } from "./Icons";
+import { MultiRecipientForm } from "./MultiRecipientForm";
 import {
   Contact,
   PaymentRequest,
+  HistoryFilterType,
+  getProfileByWallet,
   getProfileIdByWallet,
   getIncomingPaymentRequests,
   getSentPaymentRequests,
   createPaymentRequest as createPaymentRequestQuery,
   updatePaymentRequestStatus as updatePaymentRequestStatusQuery,
+  updateHistoryFilterPreference,
+  createContact,
 } from "@/lib/supabase/queries";
 
 interface RequestsTabProps {
@@ -22,6 +27,9 @@ interface RequestsTabProps {
   payingRequestId: string | null;
   isSending: boolean;
   isConfirming: boolean;
+  prefilledContact?: Contact | null;
+  onPrefilledContactUsed?: () => void;
+  onSendMoney?: (toAddress: string, amount: number, memo?: string) => void;
 }
 
 export function usePaymentRequests(currentWalletAddress: string | null) {
@@ -73,7 +81,6 @@ export function usePaymentRequests(currentWalletAddress: string | null) {
     }
   }, [currentWalletAddress, loadPaymentRequests]);
 
-  // Periodic refresh every 30 seconds
   useEffect(() => {
     if (!currentWalletAddress) return;
     
@@ -104,6 +111,9 @@ export function RequestsTab({
   payingRequestId,
   isSending,
   isConfirming,
+  prefilledContact,
+  onPrefilledContactUsed,
+  onSendMoney,
 }: RequestsTabProps) {
   const {
     paymentRequests,
@@ -114,62 +124,157 @@ export function RequestsTab({
     loadPaymentRequests,
   } = usePaymentRequests(currentWalletAddress);
 
-  // Form state
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newPayerAddress, setNewPayerAddress] = useState("");
-  const [newAmount, setNewAmount] = useState("");
-  const [newMemo, setNewMemo] = useState("");
-  const [createError, setCreateError] = useState<string | null>(null);
+  // Form visibility state
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [showSendForm, setShowSendForm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [contactSearch, setContactSearch] = useState("");
-  const [showContactDropdown, setShowContactDropdown] = useState(false);
+  
+  // History state
   const [showHistory, setShowHistory] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilterType>("all");
 
-  const createPaymentRequest = async () => {
-    if (!currentWalletAddress || !newPayerAddress || !newAmount) return;
+  // Save as contact state (for pending requests)
+  const [saveAsContactId, setSaveAsContactId] = useState<string | null>(null);
+  const [saveAsContactLabel, setSaveAsContactLabel] = useState("");
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [saveContactError, setSaveContactError] = useState<string | null>(null);
+
+  // Handle prefilled contact
+  useEffect(() => {
+    if (prefilledContact) {
+      setShowRequestForm(true);
+      loadContacts();
+      onPrefilledContactUsed?.();
+    }
+  }, [prefilledContact, onPrefilledContactUsed, loadContacts]);
+
+  // Load user's filter preference
+  useEffect(() => {
+    const loadFilterPreference = async () => {
+      if (!currentWalletAddress) return;
+      const result = await getProfileByWallet(currentWalletAddress);
+      if (result.error) {
+        console.error("Failed to load filter preference:", result.error);
+        return;
+      }
+      if (result.data?.history_filter_default) {
+        setHistoryFilter(result.data.history_filter_default);
+      }
+    };
+    loadFilterPreference();
+  }, [currentWalletAddress]);
+
+  const handleFilterChange = async (newFilter: HistoryFilterType) => {
+    const previousFilter = historyFilter;
+    setHistoryFilter(newFilter);
+    if (currentWalletAddress) {
+      const result = await updateHistoryFilterPreference({
+        walletAddress: currentWalletAddress,
+        filterType: newFilter,
+      });
+      if (result.error) {
+        setHistoryFilter(previousFilter);
+        console.error("Failed to save filter preference:", result.error);
+      }
+    }
+  };
+
+  const isContact = useCallback((address: string | undefined) => {
+    if (!address) return false;
+    return contacts.some(c => c.contact_wallet_address.toLowerCase() === address.toLowerCase());
+  }, [contacts]);
+
+  const handleSaveAsContact = async (walletAddress: string) => {
+    if (!currentWalletAddress || !saveAsContactLabel.trim()) return;
     
-    const amount = parseFloat(newAmount);
-    if (isNaN(amount) || amount < 0.01) {
-      setCreateError("Minimum amount is $0.01 USDC");
-      return;
+    setIsSavingContact(true);
+    setSaveContactError(null);
+    try {
+      const profileResult = await getProfileIdByWallet(currentWalletAddress);
+      if (!profileResult.data) {
+        setSaveContactError("Profile not found. Please sign in again.");
+        return;
+      }
+      
+      const result = await createContact({
+        ownerId: profileResult.data.id,
+        contactWalletAddress: walletAddress,
+        label: saveAsContactLabel.trim(),
+      });
+      
+      if (result.error) {
+        setSaveContactError("Failed to save contact. Please try again.");
+      } else {
+        loadContacts();
+        setSaveAsContactId(null);
+        setSaveAsContactLabel("");
+      }
+    } finally {
+      setIsSavingContact(false);
     }
-    if (amount > 10000) {
-      setCreateError("Maximum amount is $10,000 USDC");
-      return;
-    }
+  };
+
+  // Handle request form submission
+  const handleRequestSubmit = async (data: { recipients: { address: string; amount: number }[]; memo?: string }) => {
+    if (!currentWalletAddress) return;
     
     setIsCreating(true);
-    setCreateError(null);
+    setPaymentRequestsError(null);
     
     try {
       const profileResult = await getProfileIdByWallet(currentWalletAddress);
       if (!profileResult.data) {
-        throw new Error("Profile not found. Please sign in again.");
+        setPaymentRequestsError("Profile not found. Please sign in again.");
+        return;
       }
       
-      const amountInMicroUnits = Math.floor(amount * 1e6);
+      const results: { address: string; success: boolean; error?: string }[] = [];
       
-      const result = await createPaymentRequestQuery({
-        requesterId: profileResult.data.id,
-        payerWalletAddress: newPayerAddress,
-        amount: amountInMicroUnits,
-        memo: newMemo || null,
-      });
+      for (const recipient of data.recipients) {
+        try {
+          const amountInMicroUnits = Math.floor(recipient.amount * 1e6);
+          await createPaymentRequestQuery({
+            requesterId: profileResult.data.id,
+            payerWalletAddress: recipient.address,
+            amount: amountInMicroUnits,
+            memo: data.memo || null,
+          });
+          results.push({ address: recipient.address, success: true });
+        } catch (err) {
+          results.push({ 
+            address: recipient.address, 
+            success: false, 
+            error: err instanceof Error ? err.message : "Unknown error" 
+          });
+        }
+      }
       
-      if (result.error) throw new Error(result.error);
+      const failures = results.filter(r => !r.success);
+      if (failures.length > 0) {
+        const failedAddresses = failures.map(f => `${f.address.slice(0, 6)}...`).join(", ");
+        setPaymentRequestsError(`Failed to create ${failures.length} request(s) for: ${failedAddresses}`);
+      }
       
-      setNewPayerAddress("");
-      setNewAmount("");
-      setNewMemo("");
-      setContactSearch("");
-      setShowContactDropdown(false);
-      setShowCreateForm(false);
-      await loadPaymentRequests();
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Failed to create payment request");
+      if (results.some(r => r.success)) {
+        await loadPaymentRequests();
+      }
+      
+      if (failures.length === 0) {
+        setShowRequestForm(false);
+      }
     } finally {
       setIsCreating(false);
     }
+  };
+
+  // Handle send form submission
+  const handleSendSubmit = async (data: { recipients: { address: string; amount: number }[]; memo?: string }) => {
+    if (!onSendMoney) return;
+    
+    for (const recipient of data.recipients) {
+      onSendMoney(recipient.address, recipient.amount, data.memo);
+    }
+    setShowSendForm(false);
   };
 
   const cancelRequest = async (requestId: string, action: "reject" | "cancel") => {
@@ -208,23 +313,27 @@ export function RequestsTab({
 
   return (
     <>
-      {/* Header with Create and Refresh */}
+      {/* Header with Request, Send, and Refresh */}
       <div className="flex gap-2">
         <button
           onClick={() => {
-            const newState = !showCreateForm;
-            setShowCreateForm(newState);
-            if (newState) {
-              loadContacts();
-            } else {
-              setContactSearch("");
-              setShowContactDropdown(false);
-              setNewPayerAddress("");
-            }
+            setShowRequestForm(!showRequestForm);
+            setShowSendForm(false);
+            if (!showRequestForm) loadContacts();
           }}
-          className="flex-1 btn-success"
+          className={`flex-1 ${showRequestForm ? "btn-secondary" : "btn-success"}`}
         >
-          {showCreateForm ? "Cancel" : "Create Request"}
+          {showRequestForm ? "Cancel" : "Request"}
+        </button>
+        <button
+          onClick={() => {
+            setShowSendForm(!showSendForm);
+            setShowRequestForm(false);
+            if (!showSendForm) loadContacts();
+          }}
+          className={`flex-1 ${showSendForm ? "btn-secondary" : "btn-primary"}`}
+        >
+          {showSendForm ? "Cancel" : "Send"}
         </button>
         <button
           onClick={() => loadPaymentRequests(true)}
@@ -236,103 +345,27 @@ export function RequestsTab({
         </button>
       </div>
 
-      {/* Create Payment Request Form */}
-      {showCreateForm && (
-        <div className="card">
-          <p className="card-title">New Payment Request</p>
-          
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search contacts or enter wallet address..."
-              value={contactSearch}
-              onChange={(e) => {
-                const value = e.target.value;
-                setContactSearch(value);
-                if (value === "") {
-                  setNewPayerAddress("");
-                  setShowContactDropdown(contacts.length > 0);
-                } else if (value.startsWith("0x")) {
-                  setNewPayerAddress(value);
-                  setShowContactDropdown(false);
-                } else {
-                  setShowContactDropdown(contacts.length > 0);
-                }
-              }}
-              onFocus={() => {
-                if (contacts.length > 0 && !contactSearch.startsWith("0x")) {
-                  setShowContactDropdown(true);
-                }
-              }}
-              className="input"
-            />
-            
-            {showContactDropdown && contacts.length > 0 && (() => {
-              const filteredContacts = contacts.filter(c => 
-                contactSearch === "" ||
-                c.label.toLowerCase().includes(contactSearch.toLowerCase()) ||
-                c.contact_wallet_address.toLowerCase().includes(contactSearch.toLowerCase())
-              );
-              return (
-                <div className="dropdown">
-                  {filteredContacts.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        setNewPayerAddress(c.contact_wallet_address);
-                        setContactSearch(c.label);
-                        setShowContactDropdown(false);
-                      }}
-                      className="dropdown-item flex justify-between items-center"
-                    >
-                      <span className="font-medium">{c.label}</span>
-                      <span className="text-gray-500 text-xs font-mono truncate ml-2">
-                        {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
-                      </span>
-                    </button>
-                  ))}
-                  {filteredContacts.length === 0 && (
-                    <p className="px-3 py-2 text-gray-500 text-sm">No matching contacts</p>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-          
-          {newPayerAddress && (
-            <p className="text-xs text-gray-500 font-mono truncate">
-              To: {newPayerAddress}
-            </p>
-          )}
-          
-          <input
-            type="number"
-            placeholder="Amount (USDC)"
-            value={newAmount}
-            onChange={(e) => setNewAmount(e.target.value)}
-            step="0.01"
-            min="0"
-            className="input"
-          />
-          <input
-            type="text"
-            placeholder="Memo (optional)"
-            value={newMemo}
-            onChange={(e) => setNewMemo(e.target.value)}
-            className="input"
-          />
-          {createError && (
-            <p className="text-error">{createError}</p>
-          )}
-          <button
-            onClick={createPaymentRequest}
-            disabled={isCreating || !newPayerAddress || !newAmount}
-            className="w-full btn-primary"
-          >
-            {isCreating ? "Creating..." : "Create Request"}
-          </button>
-        </div>
+      {/* Request Money Form */}
+      {showRequestForm && (
+        <MultiRecipientForm
+          mode="request"
+          contacts={contacts}
+          onSubmit={handleRequestSubmit}
+          isSubmitting={isCreating}
+          onCancel={() => setShowRequestForm(false)}
+        />
+      )}
+
+      {/* Send Money Form */}
+      {showSendForm && onSendMoney && (
+        <MultiRecipientForm
+          mode="send"
+          contacts={contacts}
+          onSubmit={handleSendSubmit}
+          isSubmitting={isSending}
+          isConfirming={isConfirming}
+          onCancel={() => setShowSendForm(false)}
+        />
       )}
 
       {paymentRequestsError && (
@@ -379,6 +412,52 @@ export function RequestsTab({
                       Reject
                     </button>
                   </div>
+                )}
+                
+                {/* Save as Contact option */}
+                {pr.profiles?.wallet_address && !isContact(pr.profiles.wallet_address) && (
+                  <>
+                    {saveAsContactId === pr.id ? (
+                      <div className="mt-2 p-2 bg-blue-900/20 border border-blue-800 rounded">
+                        <p className="text-xs text-blue-300 mb-2">Save as contact</p>
+                        <input
+                          type="text"
+                          placeholder="Contact name (e.g., Alice)"
+                          value={saveAsContactLabel}
+                          onChange={(e) => setSaveAsContactLabel(e.target.value)}
+                          className="w-full text-sm px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white mb-2"
+                        />
+                        {saveContactError && (
+                          <p className="text-red-400 text-xs mb-2">{saveContactError}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSaveAsContact(pr.profiles!.wallet_address)}
+                            disabled={isSavingContact || !saveAsContactLabel.trim()}
+                            className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50"
+                          >
+                            {isSavingContact ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setSaveAsContactId(null); setSaveAsContactLabel(""); setSaveContactError(null); }}
+                            className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSaveAsContactId(pr.id)}
+                        className="mt-2 text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        + Save as contact
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -431,7 +510,18 @@ export function RequestsTab({
       {/* History Section */}
       {showHistory && (
         <div className="card">
-          <p className="card-title">History</p>
+          <div className="flex justify-between items-center mb-3">
+            <p className="card-title mb-0">History</p>
+            <select
+              value={historyFilter}
+              onChange={(e) => handleFilterChange(e.target.value as HistoryFilterType)}
+              className="text-xs bg-gray-700 text-gray-200 border border-gray-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="all">All</option>
+              <option value="contacts-only">Contacts Only</option>
+              <option value="external-only">External Only</option>
+            </select>
+          </div>
           {(() => {
             const completedIncoming = paymentRequests.filter(pr => pr.status !== "pending");
             const completedSent = sentRequests.filter(pr => pr.status !== "pending");
@@ -446,6 +536,16 @@ export function RequestsTab({
                 seenIds.add(pr.id);
                 return true;
               })
+              .filter(pr => {
+                if (historyFilter === "all") return true;
+                const otherAddress = pr.direction === "sent" 
+                  ? pr.payer_wallet_address 
+                  : pr.profiles?.wallet_address;
+                const isContactAddress = isContact(otherAddress);
+                if (historyFilter === "contacts-only") return isContactAddress;
+                if (historyFilter === "external-only") return !isContactAddress;
+                return true;
+              })
               .sort((a, b) => {
                 const dateA = a.status === "paid" && a.paid_at ? a.paid_at : a.created_at;
                 const dateB = b.status === "paid" && b.paid_at ? b.paid_at : b.created_at;
@@ -456,41 +556,54 @@ export function RequestsTab({
               return <p className="text-muted">No history yet</p>;
             }
 
-            return allHistory.map((pr) => (
-              <div key={pr.id} className="list-item">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs ${pr.direction === "sent" ? "text-blue-400" : "text-purple-400"}`}>
-                      {pr.direction === "sent" ? "↑ Sent" : "↓ Received"}
-                    </span>
-                    <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
+            return allHistory.map((pr) => {
+              const amountUSDC = (Number(pr.amount) / 1e6).toFixed(2);
+              const balanceChange = pr.direction === "sent" ? `+$${amountUSDC}` : `-$${amountUSDC}`;
+              const balanceColor = pr.direction === "sent" ? "text-green-400" : "text-red-400";
+
+              return (
+                <div key={pr.id} className="list-item">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs ${pr.direction === "sent" ? "text-blue-400" : "text-purple-400"}`}>
+                        {pr.direction === "sent" ? "↑ Sent Request" : "↓ Received Request"}
+                      </span>
+                      <span className="font-medium">{amountUSDC} USDC</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {pr.status === "paid" && (
+                        <span className={`text-xs font-medium ${balanceColor}`}>
+                          {balanceChange}
+                        </span>
+                      )}
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        pr.status === "paid" ? "bg-green-800 text-green-300" :
+                        pr.status === "rejected" ? "bg-orange-800 text-orange-300" :
+                        pr.status === "cancelled" ? "bg-red-800 text-red-300" :
+                        "bg-gray-700 text-gray-300"
+                      }`}>{pr.status}</span>
+                    </div>
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    pr.status === "paid" ? "bg-green-800 text-green-300" :
-                    pr.status === "rejected" ? "bg-orange-800 text-orange-300" :
-                    pr.status === "cancelled" ? "bg-red-800 text-red-300" :
-                    "bg-gray-700 text-gray-300"
-                  }`}>{pr.status}</span>
+                  <p className="text-gray-500 font-mono text-xs mt-1">
+                    {pr.direction === "sent" 
+                      ? `To: ${pr.payer_wallet_address ? `${pr.payer_wallet_address.slice(0, 6)}...${pr.payer_wallet_address.slice(-4)}` : "Unknown"}`
+                      : `From: ${pr.profiles?.wallet_address ? `${pr.profiles.wallet_address.slice(0, 6)}...${pr.profiles.wallet_address.slice(-4)}` : "Unknown"}`
+                    }
+                  </p>
+                  {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
+                  {pr.tx_hash && (
+                    <a 
+                      href={`https://basescan.org/tx/${pr.tx_hash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 text-xs hover:underline"
+                    >
+                      View transaction
+                    </a>
+                  )}
                 </div>
-                <p className="text-gray-500 font-mono text-xs mt-1">
-                  {pr.direction === "sent" 
-                    ? `To: ${pr.payer_wallet_address ? `${pr.payer_wallet_address.slice(0, 6)}...${pr.payer_wallet_address.slice(-4)}` : "Unknown"}`
-                    : `From: ${pr.profiles?.wallet_address ? `${pr.profiles.wallet_address.slice(0, 6)}...${pr.profiles.wallet_address.slice(-4)}` : "Unknown"}`
-                  }
-                </p>
-                {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
-                {pr.tx_hash && (
-                  <a 
-                    href={`https://basescan.org/tx/${pr.tx_hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 text-xs hover:underline"
-                  >
-                    View transaction
-                  </a>
-                )}
-              </div>
-            ));
+              );
+            });
           })()}
         </div>
       )}

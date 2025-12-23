@@ -12,6 +12,7 @@ create table if not exists public.profiles (
   wallet_address text unique not null,
   created_at timestamptz not null default now(),
   last_seen_at timestamptz not null default now(),
+  history_filter_default text not null default 'all' check (history_filter_default in ('all', 'contacts-only', 'external-only')),
   constraint profiles_wallet_lowercase check (wallet_address = lower(wallet_address))
 );
 
@@ -92,9 +93,14 @@ do $$ begin
   create type public.payment_request_status as enum ('pending', 'paid', 'cancelled', 'rejected', 'expired');
 exception when duplicate_object then null; end $$;
 
+do $$ begin
+  create type public.payment_request_type as enum ('request', 'transfer');
+exception when duplicate_object then null; end $$;
+
 create table if not exists public.payment_requests (
   id uuid primary key default gen_random_uuid(),
   requester_id uuid not null references public.profiles(id) on delete cascade,
+  type public.payment_request_type not null default 'request',
 
   payer_wallet_address text not null,
   token_address text not null default '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913', -- USDC Base mainnet (lowercase)
@@ -117,6 +123,7 @@ create table if not exists public.payment_requests (
 create index if not exists payment_requests_requester_id_idx on public.payment_requests (requester_id);
 create index if not exists payment_requests_payer_wallet_idx on public.payment_requests (payer_wallet_address);
 create index if not exists payment_requests_status_idx on public.payment_requests (status);
+create index if not exists payment_requests_type_idx on public.payment_requests (type);
 
 alter table public.payment_requests enable row level security;
 
