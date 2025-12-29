@@ -78,6 +78,7 @@ export function useCDPAuth() {
   );
 
   // Update wallet addresses when currentUser changes
+  // Always use Smart Account - never fall back to EOA for main wallet
   useEffect(() => {
     if (currentUser) {
       const smart = currentUser.evmSmartAccounts?.[0] || null;
@@ -85,11 +86,10 @@ export function useCDPAuth() {
       setSmartAccountAddress(smart);
       setEoaAddress(eoa);
       
-      // Set active wallet based on preference
-      const activeWallet = selectedWalletType === "smart" ? (smart || eoa) : (eoa || smart);
-      setWalletAddress(activeWallet);
+      // Always use smart account - only set wallet when smart account is available
+      setWalletAddress(smart);
     }
-  }, [currentUser, selectedWalletType]);
+  }, [currentUser]);
 
   // Function to switch wallet type
   const switchWalletType = useCallback((type: WalletType) => {
@@ -106,8 +106,8 @@ export function useCDPAuth() {
     const syncWithSupabase = async () => {
       if (isCDPSignedIn && currentUser) {
         const smart = currentUser.evmSmartAccounts?.[0];
-        const eoa = currentUser.evmAccounts?.[0];
-        const accountAddress = selectedWalletType === "smart" ? (smart || eoa) : (eoa || smart);
+        // Always use smart account for Supabase sync
+        const accountAddress = smart;
         
         if (accountAddress) {
           setStatus("signing_in");
@@ -139,7 +139,7 @@ export function useCDPAuth() {
     };
 
     syncWithSupabase();
-  }, [isCDPSignedIn, currentUser, upsertProfile, selectedWalletType]);
+  }, [isCDPSignedIn, currentUser, upsertProfile]);
 
   const signOut = useCallback(async () => {
     try {

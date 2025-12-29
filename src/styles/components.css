@@ -69,6 +69,46 @@
     background-color: var(--danger-100);
   }
   
+  /* Primary button small */
+  .btn-primary-sm {
+    @apply py-1 px-3 text-xs font-medium rounded transition-all duration-200;
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .btn-primary-sm:hover {
+    filter: brightness(1.1);
+  }
+  .btn-primary-sm:disabled {
+    background-color: var(--neutral-400);
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  
+  /* Secondary button small */
+  .btn-secondary-sm {
+    @apply py-1 px-3 text-xs font-medium rounded transition-all duration-200;
+    background-color: var(--neutral-300);
+    color: var(--text-primary);
+  }
+  .btn-secondary-sm:hover {
+    background-color: var(--neutral-400);
+  }
+  
+  /* Danger button small */
+  .btn-danger-sm {
+    @apply py-1 px-3 text-xs font-medium rounded transition-all duration-200;
+    background-color: var(--danger);
+    color: var(--danger-foreground);
+  }
+  .btn-danger-sm:hover {
+    filter: brightness(1.1);
+  }
+  .btn-danger-sm:disabled {
+    background-color: var(--neutral-400);
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  
   /* Ghost button - subtle actions */
   .btn-ghost {
     @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-all duration-200;

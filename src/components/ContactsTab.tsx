@@ -199,7 +199,7 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
                       {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
                     </span>
                   </div>
-                  {c.note && <p className="text-gray-400 text-xs mt-1">{c.note}</p>}
+                  {c.note && <p className="text-muted-foreground text-xs mt-1">{c.note}</p>}
                 </div>
                 
                 {/* Action buttons */}
@@ -208,7 +208,7 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
                     <button
                       type="button"
                       onClick={() => onSendMoney(c)}
-                      className="p-1.5 text-green-400 hover:bg-green-900/30 rounded transition-colors"
+                      className="p-1.5 text-success-500 hover:bg-success-100 dark:hover:bg-success-900/30 rounded transition-colors"
                       title="Send money"
                     >
                       <SendIcon size="sm" />
@@ -218,7 +218,7 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
                     <button
                       type="button"
                       onClick={() => onRequestMoney(c)}
-                      className="p-1.5 text-blue-400 hover:bg-blue-900/30 rounded transition-colors"
+                      className="p-1.5 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded transition-colors"
                       title="Request money"
                     >
                       <RequestIcon size="sm" />
@@ -227,7 +227,7 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
                   <button
                     type="button"
                     onClick={() => setDeleteConfirmId(c.id)}
-                    className="p-1.5 text-red-400 hover:bg-red-900/30 rounded transition-colors"
+                    className="p-1.5 text-danger-500 hover:bg-danger-100 dark:hover:bg-danger-900/30 rounded transition-colors"
                     title="Delete contact"
                   >
                     <TrashIcon size="sm" />
@@ -237,24 +237,24 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
               
               {/* Delete confirmation */}
               {deleteConfirmId === c.id && (
-                <div className="mt-2 p-2 bg-red-900/20 border border-red-800 rounded">
-                  <p className="text-sm text-red-300 mb-2">Delete "{c.label}"?</p>
+                <div className="mt-2 p-2 bg-danger-100 dark:bg-danger-900/20 border border-danger-300 dark:border-danger-800 rounded">
+                  <p className="text-sm text-danger-600 dark:text-danger-300 mb-2">Delete "{c.label}"?</p>
                   {deleteError && (
-                    <p className="text-red-400 text-xs mb-2">{deleteError}</p>
+                    <p className="text-danger-500 text-xs mb-2">{deleteError}</p>
                   )}
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => handleDeleteContact(c.id)}
                       disabled={isDeleting}
-                      className="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
+                      className="btn-danger-sm"
                     >
                       {isDeleting ? "Deleting..." : "Delete"}
                     </button>
                     <button
                       type="button"
                       onClick={() => { setDeleteConfirmId(null); setDeleteError(null); }}
-                      className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                      className="btn-secondary-sm"
                     >
                       Cancel
                     </button>

@@ -386,14 +386,14 @@ export function RequestsTab({
                   <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
                   <span className="badge-pending">pending</span>
                 </div>
-                <p className="text-gray-500 text-xs mt-1 flex items-center gap-1">
+                <p className="text-muted-foreground text-xs mt-1 flex items-center gap-1">
                   From: {pr.profiles?.wallet_address ? (
                     <Name address={pr.profiles.wallet_address as `0x${string}`} chain={base} className="font-mono" />
                   ) : (
                     <span className="font-mono">Unknown</span>
                   )}
                 </p>
-                {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
+                {pr.memo && <p className="text-muted-foreground text-xs">{pr.memo}</p>}
                 {canPay && (
                   <div className="mt-2 flex gap-2">
                     <button
@@ -418,31 +418,31 @@ export function RequestsTab({
                 {pr.profiles?.wallet_address && !isContact(pr.profiles.wallet_address) && (
                   <>
                     {saveAsContactId === pr.id ? (
-                      <div className="mt-2 p-2 bg-blue-900/20 border border-blue-800 rounded">
-                        <p className="text-xs text-blue-300 mb-2">Save as contact</p>
+                      <div className="mt-2 p-2 bg-primary-100 dark:bg-primary-900/20 border border-primary-300 dark:border-primary-800 rounded">
+                        <p className="text-xs text-primary-600 dark:text-primary-300 mb-2">Save as contact</p>
                         <input
                           type="text"
                           placeholder="Contact name (e.g., Alice)"
                           value={saveAsContactLabel}
                           onChange={(e) => setSaveAsContactLabel(e.target.value)}
-                          className="w-full text-sm px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white mb-2"
+                          className="input text-sm mb-2"
                         />
                         {saveContactError && (
-                          <p className="text-red-400 text-xs mb-2">{saveContactError}</p>
+                          <p className="text-danger-500 text-xs mb-2">{saveContactError}</p>
                         )}
                         <div className="flex gap-2">
                           <button
                             type="button"
                             onClick={() => handleSaveAsContact(pr.profiles!.wallet_address)}
                             disabled={isSavingContact || !saveAsContactLabel.trim()}
-                            className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50"
+                            className="btn-primary-sm"
                           >
                             {isSavingContact ? "Saving..." : "Save"}
                           </button>
                           <button
                             type="button"
                             onClick={() => { setSaveAsContactId(null); setSaveAsContactLabel(""); setSaveContactError(null); }}
-                            className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                            className="btn-secondary-sm"
                           >
                             Cancel
                           </button>
@@ -452,7 +452,7 @@ export function RequestsTab({
                       <button
                         type="button"
                         onClick={() => setSaveAsContactId(pr.id)}
-                        className="mt-2 text-xs text-blue-400 hover:text-blue-300"
+                        className="mt-2 text-xs text-primary-500 hover:text-primary-400"
                       >
                         + Save as contact
                       </button>
@@ -475,14 +475,14 @@ export function RequestsTab({
                 <span className="font-medium">{(Number(pr.amount) / 1e6).toFixed(2)} USDC</span>
                 <span className="badge-sent">sent</span>
               </div>
-              <p className="text-gray-500 text-xs mt-1 flex items-center gap-1">
+              <p className="text-muted-foreground text-xs mt-1 flex items-center gap-1">
                 To: {pr.payer_wallet_address ? (
                   <Name address={pr.payer_wallet_address as `0x${string}`} chain={base} className="font-mono" />
                 ) : (
                   <span className="font-mono">Unknown</span>
                 )}
               </p>
-              {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
+              {pr.memo && <p className="text-muted-foreground text-xs">{pr.memo}</p>}
               <button
                 onClick={() => cancelRequest(pr.id, "cancel")}
                 className="mt-2 btn-ghost"
@@ -501,7 +501,7 @@ export function RequestsTab({
       {/* History Toggle */}
       <button
         onClick={() => setShowHistory(!showHistory)}
-        className="w-full py-2 px-4 bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+        className="w-full py-2 px-4 bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-muted-foreground text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
       >
         <span>{showHistory ? "Hide History" : "Show History"}</span>
         <ChevronDownIcon className={`transition-transform ${showHistory ? "rotate-180" : ""}`} />
@@ -515,7 +515,7 @@ export function RequestsTab({
             <select
               value={historyFilter}
               onChange={(e) => handleFilterChange(e.target.value as HistoryFilterType)}
-              className="text-xs bg-gray-700 text-gray-200 border border-gray-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="text-xs bg-neutral-100 dark:bg-neutral-700 text-foreground border border-neutral-300 dark:border-neutral-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
               <option value="all">All</option>
               <option value="contacts-only">Contacts Only</option>
@@ -559,13 +559,13 @@ export function RequestsTab({
             return allHistory.map((pr) => {
               const amountUSDC = (Number(pr.amount) / 1e6).toFixed(2);
               const balanceChange = pr.direction === "sent" ? `+$${amountUSDC}` : `-$${amountUSDC}`;
-              const balanceColor = pr.direction === "sent" ? "text-green-400" : "text-red-400";
+              const balanceColor = pr.direction === "sent" ? "text-success-500" : "text-danger-500";
 
               return (
                 <div key={pr.id} className="list-item">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs ${pr.direction === "sent" ? "text-blue-400" : "text-purple-400"}`}>
+                      <span className={`text-xs ${pr.direction === "sent" ? "text-primary-500" : "text-primary-400"}`}>
                         {pr.direction === "sent" ? "↑ Sent Request" : "↓ Received Request"}
                       </span>
                       <span className="font-medium">{amountUSDC} USDC</span>
@@ -576,27 +576,27 @@ export function RequestsTab({
                           {balanceChange}
                         </span>
                       )}
-                      <span className={`text-xs px-2 py-0.5 rounded ${
-                        pr.status === "paid" ? "bg-green-800 text-green-300" :
-                        pr.status === "rejected" ? "bg-orange-800 text-orange-300" :
-                        pr.status === "cancelled" ? "bg-red-800 text-red-300" :
-                        "bg-gray-700 text-gray-300"
-                      }`}>{pr.status}</span>
+                      <span className={
+                        pr.status === "paid" ? "badge-paid" :
+                        pr.status === "rejected" ? "badge-rejected" :
+                        pr.status === "cancelled" ? "badge-cancelled" :
+                        "badge-pending"
+                      }>{pr.status}</span>
                     </div>
                   </div>
-                  <p className="text-gray-500 font-mono text-xs mt-1">
+                  <p className="text-muted-foreground font-mono text-xs mt-1">
                     {pr.direction === "sent" 
                       ? `To: ${pr.payer_wallet_address ? `${pr.payer_wallet_address.slice(0, 6)}...${pr.payer_wallet_address.slice(-4)}` : "Unknown"}`
                       : `From: ${pr.profiles?.wallet_address ? `${pr.profiles.wallet_address.slice(0, 6)}...${pr.profiles.wallet_address.slice(-4)}` : "Unknown"}`
                     }
                   </p>
-                  {pr.memo && <p className="text-gray-400 text-xs">{pr.memo}</p>}
+                  {pr.memo && <p className="text-muted-foreground text-xs">{pr.memo}</p>}
                   {pr.tx_hash && (
                     <a 
                       href={`https://basescan.org/tx/${pr.tx_hash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-400 text-xs hover:underline"
+                      className="text-primary-500 text-xs hover:underline"
                     >
                       View transaction
                     </a>

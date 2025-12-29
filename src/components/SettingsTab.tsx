@@ -64,68 +64,27 @@ export function SettingsTab({
         </div>
       </div>
 
-      <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Wallet Settings</h3>
+      <h3 className="font-medium text-foreground">Wallet Settings</h3>
       
-      {isCDPSignedIn && cdpAuth.smartAccountAddress && cdpAuth.eoaAddress ? (
-        <div className="space-y-3">
-          <p className="text-sm text-gray-400">Select which wallet to use:</p>
-          
-          {/* Smart Account Option */}
-          <button
-            onClick={() => cdpAuth.switchWalletType("smart")}
-            className={`w-full p-4 rounded-lg border-2 transition-colors text-left ${
-              cdpAuth.selectedWalletType === "smart"
-                ? "border-blue-500 bg-blue-900/20"
-                : "border-gray-700 bg-gray-900 hover:border-gray-600"
-            }`}
-          >
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-white font-medium">Smart Account</p>
-                <p className="text-gray-500 font-mono text-xs">
-                  {cdpAuth.smartAccountAddress.slice(0, 10)}...{cdpAuth.smartAccountAddress.slice(-8)}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-white font-bold">${formattedSmartBalance}</p>
-                <p className="text-gray-500 text-xs">USDC</p>
-              </div>
+      {isCDPSignedIn && cdpAuth.smartAccountAddress ? (
+        <div className="card">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-foreground font-medium">Smart Account</p>
+              <p className="text-muted-foreground font-mono text-xs">
+                {cdpAuth.smartAccountAddress.slice(0, 10)}...{cdpAuth.smartAccountAddress.slice(-8)}
+              </p>
             </div>
-            {cdpAuth.selectedWalletType === "smart" && (
-              <span className="inline-block mt-2 text-xs text-blue-400">✓ Active</span>
-            )}
-          </button>
-          
-          {/* EOA Option */}
-          <button
-            onClick={() => cdpAuth.switchWalletType("eoa")}
-            className={`w-full p-4 rounded-lg border-2 transition-colors text-left ${
-              cdpAuth.selectedWalletType === "eoa"
-                ? "border-blue-500 bg-blue-900/20"
-                : "border-gray-700 bg-gray-900 hover:border-gray-600"
-            }`}
-          >
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-white font-medium">EOA Wallet</p>
-                <p className="text-gray-500 font-mono text-xs">
-                  {cdpAuth.eoaAddress.slice(0, 10)}...{cdpAuth.eoaAddress.slice(-8)}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-white font-bold">${formattedEoaBalance}</p>
-                <p className="text-gray-500 text-xs">USDC</p>
-              </div>
+            <div className="text-right">
+              <p className="text-foreground font-bold">${formattedSmartBalance}</p>
+              <p className="text-muted-foreground text-xs">USDC</p>
             </div>
-            {cdpAuth.selectedWalletType === "eoa" && (
-              <span className="inline-block mt-2 text-xs text-blue-400">✓ Active</span>
-            )}
-          </button>
+          </div>
         </div>
       ) : (
-        <p className="text-gray-500 text-sm">
+        <p className="text-muted-foreground text-sm">
           {isCDPSignedIn 
-            ? "Only one wallet type available" 
+            ? "Loading wallet..." 
             : "Sign in with social login to manage wallet settings"}
         </p>
       )}
