@@ -64,7 +64,11 @@ export default function Home() {
   const walletAuth = useSupabaseWeb3Auth();
   const cdpAuth = useCDPAuth();
   
-  const currentWalletAddress = address || cdpAuth.walletAddress;
+  // For CDP users, always use smart account. For external wallet users, use their address.
+  // Prioritize smart account over wagmi address to prevent showing EOA first
+  const currentWalletAddress = isCDPSignedIn 
+    ? cdpAuth.smartAccountAddress 
+    : (address || cdpAuth.walletAddress);
   
   // USDC Balances using custom hook
   const { formattedBalance, refetch: refetchBalance } = useUSDCBalance(currentWalletAddress);
@@ -88,6 +92,9 @@ export default function Home() {
   
   // Legacy - for prefilling RequestsTab (keeping for backwards compatibility)
   const [requestMoneyContact, setRequestMoneyContact] = useState<Contact | null>(null);
+  
+  // Copy address confirmation
+  const [showCopied, setShowCopied] = useState(false);
   
   // Pending transfer state for recording to history
   const [pendingTransfer, setPendingTransfer] = useState<{
@@ -384,19 +391,26 @@ return (
     <div className="content-area">
       <div className="content-wrapper">
         <div className="balance-card">
-          <div className="flex items-center justify-center gap-2 mb-2">
+          <div className="flex items-center justify-center gap-2 mb-2 relative">
             <p className="wallet-address">
               {currentWalletAddress?.slice(0, 6)}...{currentWalletAddress?.slice(-4)}
             </p>
             <button
               onClick={() => {
-                if (currentWalletAddress) navigator.clipboard.writeText(currentWalletAddress);
+                if (currentWalletAddress) {
+                  navigator.clipboard.writeText(currentWalletAddress);
+                  setShowCopied(true);
+                  setTimeout(() => setShowCopied(false), 2000);
+                }
               }}
-              className="p-1 hover:bg-neutral-200 dark:hover:bg-gray-700 rounded transition-colors"
+              className="p-1 rounded transition-colors copy-btn"
               title="Copy address"
             >
-              <ClipboardIcon className="text-neutral-500" />
+              <ClipboardIcon />
             </button>
+            {showCopied && (
+              <span className="copy-toast">Copied!</span>
+            )}
           </div>
           <p className="text-4xl font-bold text-foreground">${formattedBalance}</p>
           <p className="text-muted-foreground text-sm">USDC Balance</p>

@@ -184,6 +184,12 @@ export function RequestsTab({
     return contacts.some(c => c.contact_wallet_address.toLowerCase() === address.toLowerCase());
   }, [contacts]);
 
+  const getContactLabel = useCallback((address: string | undefined) => {
+    if (!address) return null;
+    const contact = contacts.find(c => c.contact_wallet_address.toLowerCase() === address.toLowerCase());
+    return contact?.label || null;
+  }, [contacts]);
+
   const handleSaveAsContact = async (walletAddress: string) => {
     if (!currentWalletAddress || !saveAsContactLabel.trim()) return;
     
@@ -388,7 +394,9 @@ export function RequestsTab({
                 </div>
                 <p className="text-muted-foreground text-xs mt-1 flex items-center gap-1">
                   From: {pr.profiles?.wallet_address ? (
-                    <Name address={pr.profiles.wallet_address as `0x${string}`} chain={base} className="font-mono" />
+                    getContactLabel(pr.profiles.wallet_address) || (
+                      <Name address={pr.profiles.wallet_address as `0x${string}`} chain={base} className="font-mono" />
+                    )
                   ) : (
                     <span className="font-mono">Unknown</span>
                   )}
@@ -477,7 +485,9 @@ export function RequestsTab({
               </div>
               <p className="text-muted-foreground text-xs mt-1 flex items-center gap-1">
                 To: {pr.payer_wallet_address ? (
-                  <Name address={pr.payer_wallet_address as `0x${string}`} chain={base} className="font-mono" />
+                  getContactLabel(pr.payer_wallet_address) || (
+                    <Name address={pr.payer_wallet_address as `0x${string}`} chain={base} className="font-mono" />
+                  )
                 ) : (
                   <span className="font-mono">Unknown</span>
                 )}
@@ -501,7 +511,7 @@ export function RequestsTab({
       {/* History Toggle */}
       <button
         onClick={() => setShowHistory(!showHistory)}
-        className="w-full py-2 px-4 bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-muted-foreground text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+        className="w-full py-2 px-4 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 history-toggle-btn"
       >
         <span>{showHistory ? "Hide History" : "Show History"}</span>
         <ChevronDownIcon className={`transition-transform ${showHistory ? "rotate-180" : ""}`} />
@@ -515,7 +525,7 @@ export function RequestsTab({
             <select
               value={historyFilter}
               onChange={(e) => handleFilterChange(e.target.value as HistoryFilterType)}
-              className="text-xs bg-neutral-100 dark:bg-neutral-700 text-foreground border border-neutral-300 dark:border-neutral-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className="text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 history-filter-select"
             >
               <option value="all">All</option>
               <option value="contacts-only">Contacts Only</option>
@@ -584,10 +594,10 @@ export function RequestsTab({
                       }>{pr.status}</span>
                     </div>
                   </div>
-                  <p className="text-muted-foreground font-mono text-xs mt-1">
+                  <p className="text-muted-foreground text-xs mt-1">
                     {pr.direction === "sent" 
-                      ? `To: ${pr.payer_wallet_address ? `${pr.payer_wallet_address.slice(0, 6)}...${pr.payer_wallet_address.slice(-4)}` : "Unknown"}`
-                      : `From: ${pr.profiles?.wallet_address ? `${pr.profiles.wallet_address.slice(0, 6)}...${pr.profiles.wallet_address.slice(-4)}` : "Unknown"}`
+                      ? `To: ${getContactLabel(pr.payer_wallet_address) || (pr.payer_wallet_address ? `${pr.payer_wallet_address.slice(0, 6)}...${pr.payer_wallet_address.slice(-4)}` : "Unknown")}`
+                      : `From: ${getContactLabel(pr.profiles?.wallet_address) || (pr.profiles?.wallet_address ? `${pr.profiles.wallet_address.slice(0, 6)}...${pr.profiles.wallet_address.slice(-4)}` : "Unknown")}`
                     }
                   </p>
                   {pr.memo && <p className="text-muted-foreground text-xs">{pr.memo}</p>}

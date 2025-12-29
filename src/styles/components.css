@@ -314,6 +314,48 @@
     color: var(--text-muted);
   }
 
+  /* ==================== COPY BUTTON ==================== */
+  
+  .copy-btn {
+    color: var(--text-muted);
+  }
+  .copy-btn:hover {
+    background-color: var(--neutral-300);
+  }
+  
+  .copy-toast {
+    @apply absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs px-2 py-1 rounded;
+    background-color: var(--neutral-300);
+    color: var(--text-primary);
+    animation: fadeInOut 2s ease-in-out;
+  }
+  
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translateX(-50%) translateY(4px); }
+    15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+  }
+
+  /* ==================== HISTORY ==================== */
+  
+  .history-toggle-btn {
+    background-color: var(--neutral-300);
+    color: var(--text-secondary);
+  }
+  .history-toggle-btn:hover {
+    background-color: var(--neutral-400);
+  }
+  
+  .history-filter-select {
+    background-color: var(--neutral-200);
+    color: var(--text-primary);
+    border: 1px solid var(--neutral-400);
+  }
+  .history-filter-select:focus {
+    ring-color: var(--primary);
+  }
+
   /* ==================== LAYOUT ==================== */
   
   .main-container {

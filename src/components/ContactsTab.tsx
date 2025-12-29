@@ -16,6 +16,8 @@ interface ContactsTabProps {
   onRequestMoney?: (contact: Contact) => void;
 }
 
+const CONTACTS_CACHE_KEY = "basesplit-contacts";
+
 /**
  * Loads and exposes contacts associated with the given wallet address.
  *
@@ -26,11 +28,26 @@ interface ContactsTabProps {
  *  - `loadContacts`: a function to re-fetch the contacts for the current `currentWalletAddress`.
  */
 export function useContacts(currentWalletAddress: string | null) {
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>(() => {
+    // Initialize from localStorage cache
+    if (typeof window !== "undefined" && currentWalletAddress) {
+      try {
+        const cached = localStorage.getItem(`${CONTACTS_CACHE_KEY}-${currentWalletAddress.toLowerCase()}`);
+        return cached ? JSON.parse(cached) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
   const [contactsError, setContactsError] = useState<string | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  const loadContacts = useCallback(async () => {
+  const loadContacts = useCallback(async (forceRefresh = false) => {
     if (!currentWalletAddress) return;
+
+    // Skip if already loaded and not forcing refresh
+    if (hasLoadedOnce && !forceRefresh && contacts.length > 0) return;
 
     setContactsError(null);
     try {
@@ -45,19 +62,48 @@ export function useContacts(currentWalletAddress: string | null) {
         setContactsError(contactsResult.error);
         setContacts([]);
       } else {
-        setContacts(contactsResult.data || []);
+        const newContacts = contactsResult.data || [];
+        setContacts(newContacts);
+        // Cache to localStorage
+        try {
+          localStorage.setItem(
+            `${CONTACTS_CACHE_KEY}-${currentWalletAddress.toLowerCase()}`,
+            JSON.stringify(newContacts)
+          );
+        } catch {
+          // Ignore localStorage errors
+        }
       }
+      setHasLoadedOnce(true);
     } catch (err) {
       setContactsError(err instanceof Error ? err.message : "Failed to load contacts");
       setContacts([]);
     }
-  }, [currentWalletAddress]);
+  }, [currentWalletAddress, hasLoadedOnce, contacts.length]);
 
+  // Load on mount or wallet change
   useEffect(() => {
-    loadContacts();
+    if (currentWalletAddress) {
+      // Load from cache first
+      try {
+        const cached = localStorage.getItem(`${CONTACTS_CACHE_KEY}-${currentWalletAddress.toLowerCase()}`);
+        if (cached) {
+          setContacts(JSON.parse(cached));
+        }
+      } catch {
+        // Ignore
+      }
+      // Then refresh from server
+      loadContacts(true);
+    }
+  }, [currentWalletAddress]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Force refresh function for when contacts are added/deleted
+  const refreshContacts = useCallback(() => {
+    return loadContacts(true);
   }, [loadContacts]);
 
-  return { contacts, contactsError, loadContacts };
+  return { contacts, contactsError, loadContacts: refreshContacts };
 }
 
 /**
