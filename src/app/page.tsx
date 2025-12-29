@@ -270,61 +270,6 @@ export default function Home() {
     });
   }, [address, writeContracts, capabilities]);
 
-  // Record transfer to history and handle save as contact when transaction is confirmed
-  useEffect(() => {
-    const recordTransfer = async () => {
-      const transfer = pendingTransferRef.current || pendingTransfer;
-      if (!isConfirmed || !txHash || !transfer || !currentWalletAddress) return;
-      
-      // Guard against duplicate recording in React Strict Mode
-      if (isRecordingTransferRef.current) return;
-      isRecordingTransferRef.current = true;
-      
-      try {
-        const profileResult = await getProfileIdByWallet(currentWalletAddress);
-        if (profileResult.data) {
-          // Record transfer to history
-          await createDirectTransfer({
-            senderId: profileResult.data.id,
-            recipientWalletAddress: transfer.toAddress,
-            amount: transfer.amount,
-            memo: transfer.memo,
-            txHash,
-          });
-          
-          // Save as contact if requested
-          if (transfer.saveAsContact && transfer.contactLabel) {
-            await createContact({
-              ownerId: profileResult.data.id,
-              contactWalletAddress: transfer.toAddress,
-              label: transfer.contactLabel,
-            });
-            loadContacts();
-          }
-
-// Send money from RequestsTab form (with optional save as contact)
-const sendMoneyFromRequests = useCallback((toAddress: string, amount: number, memo?: string, saveAsContact?: boolean, contactLabel?: string) => {
-  if (!address) return;
-  
-  const amountInMicroUnits = Math.floor(amount * 1e6);
-  
-  // Track pending transfer for history recording
-  setPendingTransfer({ toAddress, amount: amountInMicroUnits, memo, saveAsContact, contactLabel });
-  pendingTransferRef.current = { toAddress, amount: amountInMicroUnits, memo, saveAsContact, contactLabel };
-  
-  writeContracts({
-    contracts: [
-      {
-        address: USDC_BASE_MAINNET as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: "transfer",
-        args: [toAddress as `0x${string}`, BigInt(amountInMicroUnits)],
-      },
-    ],
-    capabilities,
-  });
-}, [address, writeContracts, capabilities]);
-
 // Record transfer to history and handle save as contact when transaction is confirmed
 useEffect(() => {
   const recordTransfer = async () => {
