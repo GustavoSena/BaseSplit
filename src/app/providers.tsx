@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { base } from "wagmi/chains";
 import { coinbaseWallet } from "wagmi/connectors";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const queryClient = new QueryClient();
 const cdpConfig: Config = {
@@ -51,19 +52,21 @@ interface ProvidersProps {
 
 export function Providers({ children }: ProvidersProps) {
   return (
-    <CDPReactProvider config={cdpConfig}>
-      <CDPHooksProvider config={cdpConfig}>
-        <WagmiProvider config={wagmiConfig}>
-          <QueryClientProvider client={queryClient}>
-            <OnchainKitProvider
-              chain={base}
-              apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-            >
-              {children}
-            </OnchainKitProvider>
-          </QueryClientProvider>
-        </WagmiProvider>
-      </CDPHooksProvider>
-    </CDPReactProvider>
+    <ThemeProvider defaultTheme="dark">
+      <CDPReactProvider config={cdpConfig}>
+        <CDPHooksProvider config={cdpConfig}>
+          <WagmiProvider config={wagmiConfig}>
+            <QueryClientProvider client={queryClient}>
+              <OnchainKitProvider
+                chain={base}
+                apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+              >
+                {children}
+              </OnchainKitProvider>
+            </QueryClientProvider>
+          </WagmiProvider>
+        </CDPHooksProvider>
+      </CDPReactProvider>
+    </ThemeProvider>
   );
 }

@@ -1,5 +1,8 @@
 "use client";
 
+import { useTheme } from "./ThemeProvider";
+import { SunIcon, MoonIcon } from "./Icons";
+
 interface CDPAuthType {
   smartAccountAddress: string | null;
   eoaAddress: string | null;
@@ -28,9 +31,40 @@ export function SettingsTab({
   formattedSmartBalance,
   formattedEoaBalance,
 }: SettingsTabProps) {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <div className="space-y-4">
-      <h3 className="text-white font-medium">Wallet Settings</h3>
+      {/* Theme Toggle */}
+      <div className="card">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>Appearance</p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              {theme === "dark" ? "Dark mode" : "Light mode"}
+            </p>
+          </div>
+          <button
+            onClick={toggleTheme}
+            className="theme-toggle flex items-center gap-2 px-3 py-2"
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            {theme === "dark" ? (
+              <>
+                <SunIcon size="sm" />
+                <span className="text-sm">Light</span>
+              </>
+            ) : (
+              <>
+                <MoonIcon size="sm" />
+                <span className="text-sm">Dark</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Wallet Settings</h3>
       
       {isCDPSignedIn && cdpAuth.smartAccountAddress && cdpAuth.eoaAddress ? (
         <div className="space-y-3">
