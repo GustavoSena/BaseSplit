@@ -301,85 +301,159 @@ export default function Home() {
             });
             loadContacts();
           }
-        }
-      } catch (err) {
-        console.error("Failed to record transfer:", err);
-      }
-      
-      setPendingTransfer(null);
-      pendingTransferRef.current = null;
-      isRecordingTransferRef.current = false;
-      refetchBalance();
-    };
+
+// Send money from RequestsTab form (with optional save as contact)
+const sendMoneyFromRequests = useCallback((toAddress: string, amount: number, memo?: string, saveAsContact?: boolean, contactLabel?: string) => {
+  if (!address) return;
+  
+  const amountInMicroUnits = Math.floor(amount * 1e6);
+  
+  // Track pending transfer for history recording
+  setPendingTransfer({ toAddress, amount: amountInMicroUnits, memo, saveAsContact, contactLabel });
+  pendingTransferRef.current = { toAddress, amount: amountInMicroUnits, memo, saveAsContact, contactLabel };
+  
+  writeContracts({
+    contracts: [
+      {
+        address: USDC_BASE_MAINNET as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: "transfer",
+        args: [toAddress as `0x${string}`, BigInt(amountInMicroUnits)],
+      },
+    ],
+    capabilities,
+  });
+}, [address, writeContracts, capabilities]);
+
+// Record transfer to history and handle save as contact when transaction is confirmed
+useEffect(() => {
+  const recordTransfer = async () => {
+    const transfer = pendingTransferRef.current || pendingTransfer;
+    if (!isConfirmed || !txHash || !transfer || !currentWalletAddress) return;
     
-    recordTransfer();
-  }, [isConfirmed, txHash, pendingTransfer, currentWalletAddress, loadContacts, refetchBalance]);
-
-  // Close send money modal when transaction is confirmed
-  useEffect(() => {
-    if (isConfirmed && sendMoneyContact) {
-      setSendMoneyContact(null);
-    }
-  }, [isConfirmed, sendMoneyContact]);
-
-  // Handle request money - show modal popup (like send money)
-  const handleRequestMoney = useCallback((contact: Contact) => {
-    setRequestModalContact(contact);
-  }, []);
-
-  // Create payment request from modal
-  const createRequestFromModal = useCallback(async (address: string, amount: number, memo?: string) => {
-    if (!currentWalletAddress) return;
+    // Guard against duplicate recording in React Strict Mode
+    if (isRecordingTransferRef.current) return;
+    isRecordingTransferRef.current = true;
     
-    setIsCreatingRequest(true);
     try {
       const profileResult = await getProfileIdByWallet(currentWalletAddress);
-      if (!profileResult.data) {
-        console.error("Profile not found");
-        return;
+      if (profileResult.data) {
+        // Record transfer to history
+        await createDirectTransfer({
+          senderId: profileResult.data.id,
+          recipientWalletAddress: transfer.toAddress,
+          amount: transfer.amount,
+          memo: transfer.memo,
+          txHash,
+        });
+        
+        // Save as contact if requested
+        if (transfer.saveAsContact && transfer.contactLabel) {
+          await createContact({
+            ownerId: profileResult.data.id,
+            contactWalletAddress: transfer.toAddress,
+            label: transfer.contactLabel,
+          });
+          loadContacts();
+        }
       }
-      
-      const amountInMicroUnits = Math.floor(amount * 1e6);
-      await createPaymentRequestQuery({
-        requesterId: profileResult.data.id,
-        payerWalletAddress: address,
-        amount: amountInMicroUnits,
-        memo: memo || null,
-      });
-      
-      setRequestModalContact(null);
     } catch (err) {
-      console.error("Failed to create request:", err);
-    } finally {
-      setIsCreatingRequest(false);
+      console.error("Failed to record transfer:", err);
     }
-  }, [currentWalletAddress]);
+    
+    setPendingTransfer(null);
+    pendingTransferRef.current = null;
+    isRecordingTransferRef.current = false;
+    refetchBalance();
+  };
+  
+  recordTransfer();
+}, [isConfirmed, txHash, pendingTransfer, currentWalletAddress, loadContacts, refetchBalance]);
 
-  // Memoized callback for clearing prefilled contact (prevents effect re-runs)
-  const clearPrefilledContact = useCallback(() => {
-    setRequestMoneyContact(null);
-  }, []);
-
-  if (!mounted) {
-    return <LoadingScreen />;
+// Close send money modal when transaction is confirmed
+useEffect(() => {
+  if (isConfirmed && sendMoneyContact) {
+    setSendMoneyContact(null);
   }
+}, [isConfirmed, sendMoneyContact]);
 
-  // Not authenticated - show login screen
-  if (!isAuthenticated) {
-    return <LoginScreen isConnected={isConnected} walletAuth={walletAuth} authError={authError} />;
+// Handle request money - show modal popup (like send money)
+const handleRequestMoney = useCallback((contact: Contact) => {
+  setRequestModalContact(contact);
+}, []);
+
+// Create payment request from modal
+const createRequestFromModal = useCallback(async (address: string, amount: number, memo?: string): Promise<{ success: boolean; error?: string }> => {
+  if (!currentWalletAddress) {
+    return { success: false, error: "Wallet not connected" };
   }
+  
+  setIsCreatingRequest(true);
+  try {
+    const profileResult = await getProfileIdByWallet(currentWalletAddress);
+    if (!profileResult.data) {
+      return { success: false, error: "Profile not found. Please sign in again." };
+    }
+    
+    const amountInMicroUnits = Math.floor(amount * 1e6);
+    const result = await createPaymentRequestQuery({
+      requesterId: profileResult.data.id,
+      payerWalletAddress: address,
+      amount: amountInMicroUnits,
+      memo: memo || null,
+    });
+    
+    if (result.error) {
+      return { success: false, error: result.error };
+    }
+    
+    setRequestModalContact(null);
+    return { success: true };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Failed to create request";
+    return { success: false, error: errorMessage };
+  } finally {
+    setIsCreatingRequest(false);
+  }
+}, [currentWalletAddress]);
 
-  // Authenticated - show app
-  return (
-    <main className="main-container">
-      <DesktopHeader activeTab={activeTab} onTabChange={handleTabChange} />
+// Memoized callback for clearing prefilled contact (prevents effect re-runs)
+const clearPrefilledContact = useCallback(() => {
+  setRequestMoneyContact(null);
+}, []);
 
-      {/* Main Content */}
-      <div className="content-area">
-        <div className="content-wrapper">
-          {/* Balance Card */}
-          <div className="balance-card">
-            <div className="flex items-center justify-center gap-2 mb-2">
+if (!mounted) {
+  return <LoadingScreen />;
+}
+
+// Not authenticated - show login screen
+if (!isAuthenticated) {
+  return <LoginScreen isConnected={isConnected} walletAuth={walletAuth} authError={authError} />;
+}
+
+// Authenticated - show app
+return (
+  <main className="main-container">
+    <DesktopHeader activeTab={activeTab} onTabChange={handleTabChange} />
+
+    {/* Main Content */}
+    <div className="content-area">
+      <div className="content-wrapper">
+        {/* Balance Card */}
+        <div className="balance-card">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <p className="wallet-address">
+              {currentWalletAddress?.slice(0, 6)}...{currentWalletAddress?.slice(-4)}
+            </p>
+            <button
+              onClick={() => {
+                if (currentWalletAddress) navigator.clipboard.writeText(currentWalletAddress);
+              }}
+              className="p-1 hover:bg-gray-700 rounded transition-colors"
+              title="Copy address"
+            >
+              <ClipboardIcon className="text-gray-500" />
+            </button>
               <p className="wallet-address">
                 {currentWalletAddress?.slice(0, 6)}...{currentWalletAddress?.slice(-4)}
               </p>

@@ -11,7 +11,7 @@
     color: var(--primary-foreground);
   }
   .btn-primary:hover {
-    background-color: var(--primary-600, #2563eb);
+    background-color: var(--primary-600);
     filter: brightness(1.1);
   }
   .btn-primary:disabled {
@@ -193,6 +193,35 @@
 
   /* ==================== TEXT STYLES ==================== */
   
+  /* Theme-aware text colors */
+  .text-theme-primary {
+    color: var(--text-primary);
+  }
+  
+  .text-theme-secondary {
+    color: var(--text-secondary);
+  }
+  
+  .text-theme-muted {
+    color: var(--text-muted);
+  }
+  
+  .text-theme-inverse {
+    color: var(--text-inverse);
+  }
+  
+  .text-theme-danger {
+    color: var(--danger-400);
+  }
+  
+  .text-theme-success {
+    color: var(--success-400);
+  }
+  
+  .text-theme-warning {
+    color: var(--warning-400);
+  }
+  
   .text-error {
     @apply text-xs;
     color: var(--danger-400);
@@ -220,6 +249,28 @@
   
   .wallet-address-xs {
     @apply font-mono text-xs;
+    color: var(--text-muted);
+  }
+
+  /* ==================== MODAL TEXT ==================== */
+  
+  .modal-title {
+    @apply text-xl font-bold mb-4;
+    color: var(--text-primary);
+  }
+  
+  .modal-label {
+    @apply block text-sm mb-1;
+    color: var(--text-muted);
+  }
+  
+  .modal-text {
+    @apply font-medium;
+    color: var(--text-primary);
+  }
+  
+  .modal-subtext {
+    @apply text-xs font-mono;
     color: var(--text-muted);
   }
 

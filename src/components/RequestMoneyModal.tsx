@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { Contact } from "@/lib/supabase/queries";
+import { validateUSDCAmount } from "@/lib/validation";
 
 interface RequestMoneyModalProps {
   contact: Contact;
   onClose: () => void;
-  onRequest: (address: string, amount: number, memo?: string) => Promise<void>;
+  onRequest: (address: string, amount: number, memo?: string) => Promise<{ success: boolean; error?: string }>;
   isSubmitting: boolean;
 }
 
@@ -27,39 +28,34 @@ export function RequestMoneyModal({
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
-    const trimmedAmount = amount.trim();
-    if (!trimmedAmount) {
-      setError("Please enter an amount");
+    const validation = validateUSDCAmount(amount);
+    if (!validation.isValid) {
+      setError(validation.error);
       return;
     }
-    const amountNum = parseFloat(trimmedAmount);
-    if (isNaN(amountNum) || amountNum < 0.01) {
-      setError("Minimum amount is $0.01 USDC");
-      return;
-    }
-    if (amountNum > 10000) {
-      setError("Maximum amount is $10,000 USDC");
-      return;
-    }
+    
     setError(null);
-    await onRequest(contact.contact_wallet_address, amountNum, memo || undefined);
+    const result = await onRequest(contact.contact_wallet_address, validation.amount, memo || undefined);
+    if (!result.success && result.error) {
+      setError(result.error);
+    }
   };
 
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Request Money</h2>
+        <h2 className="modal-title">Request Money</h2>
         
         <div className="mb-4">
-          <p className="text-sm mb-1" style={{ color: 'var(--text-muted)' }}>Requesting from</p>
-          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{contact.label}</p>
-          <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+          <p className="modal-label">Requesting from</p>
+          <p className="modal-text">{contact.label}</p>
+          <p className="modal-subtext">
             {contact.contact_wallet_address.slice(0, 10)}...{contact.contact_wallet_address.slice(-8)}
           </p>
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm mb-1" style={{ color: 'var(--text-muted)' }}>Amount (USDC)</label>
+          <label className="modal-label">Amount (USDC)</label>
           <input
             type="number"
             placeholder="0.00"
@@ -73,7 +69,7 @@ export function RequestMoneyModal({
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm mb-1" style={{ color: 'var(--text-muted)' }}>Memo (optional)</label>
+          <label className="modal-label">Memo (optional)</label>
           <input
             type="text"
             placeholder="What's this for?"
@@ -84,7 +80,7 @@ export function RequestMoneyModal({
           />
         </div>
 
-        {error && <p className="text-sm mb-4" style={{ color: 'var(--danger-400)' }}>{error}</p>}
+        {error && <p className="text-sm mb-4 text-theme-danger">{error}</p>}
 
         <div className="flex gap-3">
           <button
