@@ -16,6 +16,7 @@ import { ContactsTab, useContacts } from "@/components/ContactsTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { RequestsTab } from "@/components/RequestsTab";
 import { SendMoneyModal } from "@/components/SendMoneyModal";
+import { RequestMoneyModal } from "@/components/RequestMoneyModal";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import {
   Contact,
@@ -24,6 +25,7 @@ import {
   createDirectTransfer,
   getProfileIdByWallet,
   createContact,
+  createPaymentRequest as createPaymentRequestQuery,
 } from "@/lib/supabase/queries";
 
 const ERC20_ABI = [
@@ -79,6 +81,12 @@ export default function Home() {
   
   // Send money modal state
   const [sendMoneyContact, setSendMoneyContact] = useState<Contact | null>(null);
+  
+  // Request money modal state
+  const [requestModalContact, setRequestModalContact] = useState<Contact | null>(null);
+  const [isCreatingRequest, setIsCreatingRequest] = useState(false);
+  
+  // Legacy - for prefilling RequestsTab (keeping for backwards compatibility)
   const [requestMoneyContact, setRequestMoneyContact] = useState<Contact | null>(null);
   
   // Pending transfer state for recording to history
@@ -314,11 +322,38 @@ export default function Home() {
     }
   }, [isConfirmed, sendMoneyContact]);
 
-  // Handle request money - switch to requests tab with pre-filled contact
+  // Handle request money - show modal popup (like send money)
   const handleRequestMoney = useCallback((contact: Contact) => {
-    setRequestMoneyContact(contact);
-    setActiveTab("requests");
+    setRequestModalContact(contact);
   }, []);
+
+  // Create payment request from modal
+  const createRequestFromModal = useCallback(async (address: string, amount: number, memo?: string) => {
+    if (!currentWalletAddress) return;
+    
+    setIsCreatingRequest(true);
+    try {
+      const profileResult = await getProfileIdByWallet(currentWalletAddress);
+      if (!profileResult.data) {
+        console.error("Profile not found");
+        return;
+      }
+      
+      const amountInMicroUnits = Math.floor(amount * 1e6);
+      await createPaymentRequestQuery({
+        requesterId: profileResult.data.id,
+        payerWalletAddress: address,
+        amount: amountInMicroUnits,
+        memo: memo || null,
+      });
+      
+      setRequestModalContact(null);
+    } catch (err) {
+      console.error("Failed to create request:", err);
+    } finally {
+      setIsCreatingRequest(false);
+    }
+  }, [currentWalletAddress]);
 
   // Memoized callback for clearing prefilled contact (prevents effect re-runs)
   const clearPrefilledContact = useCallback(() => {
@@ -411,6 +446,16 @@ export default function Home() {
           onSend={sendDirectMoney}
           isSending={isSending}
           isConfirming={isConfirming}
+        />
+      )}
+
+      {/* Request Money Modal */}
+      {requestModalContact && (
+        <RequestMoneyModal
+          contact={requestModalContact}
+          onClose={() => setRequestModalContact(null)}
+          onRequest={createRequestFromModal}
+          isSubmitting={isCreatingRequest}
         />
       )}
     </main>
