@@ -6,8 +6,6 @@ import { SunIcon, MoonIcon } from "./Icons";
 interface CDPAuthType {
   smartAccountAddress: string | null;
   eoaAddress: string | null;
-  selectedWalletType: "smart" | "eoa";
-  switchWalletType: (type: "smart" | "eoa") => void;
   signOut: () => void;
 }
 
@@ -39,8 +37,8 @@ export function SettingsTab({
       <div className="card">
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>Appearance</p>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="font-medium text-foreground">Appearance</p>
+            <p className="text-sm text-muted-foreground">
               {theme === "dark" ? "Dark mode" : "Light mode"}
             </p>
           </div>

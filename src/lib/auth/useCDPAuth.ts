@@ -6,7 +6,6 @@ import { supabase } from "@/lib/supabase/client";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 
 type AuthStatus = "signed_out" | "signing_in" | "signed_in";
-type WalletType = "smart" | "eoa";
 
 export function useCDPAuth() {
   const { isSignedIn: isCDPSignedIn } = useIsSignedIn();
@@ -20,12 +19,6 @@ export function useCDPAuth() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(null);
   const [eoaAddress, setEoaAddress] = useState<string | null>(null);
-  const [selectedWalletType, setSelectedWalletType] = useState<WalletType>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("preferredWalletType") as WalletType) || "smart";
-    }
-    return "smart";
-  });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -91,17 +84,6 @@ export function useCDPAuth() {
     }
   }, [currentUser]);
 
-  // Function to switch wallet type
-  const switchWalletType = useCallback((type: WalletType) => {
-    setSelectedWalletType(type);
-    localStorage.setItem("preferredWalletType", type);
-    
-    const newWallet = type === "smart" 
-      ? (smartAccountAddress || eoaAddress) 
-      : (eoaAddress || smartAccountAddress);
-    setWalletAddress(newWallet);
-  }, [smartAccountAddress, eoaAddress]);
-
   useEffect(() => {
     const syncWithSupabase = async () => {
       if (isCDPSignedIn && currentUser) {
@@ -164,8 +146,6 @@ export function useCDPAuth() {
     walletAddress,
     smartAccountAddress,
     eoaAddress,
-    selectedWalletType,
-    switchWalletType,
     isCDPSignedIn,
     isAuthenticated: status === "signed_in" && isCDPSignedIn,
   };

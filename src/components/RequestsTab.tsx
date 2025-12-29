@@ -32,9 +32,43 @@ interface RequestsTabProps {
   onSendMoney?: (toAddress: string, amount: number, memo?: string) => void;
 }
 
+const REQUESTS_CACHE_KEY = "basesplit-requests";
+
+function getCachedRequests(walletAddress: string): { incoming: PaymentRequest[]; sent: PaymentRequest[] } {
+  if (typeof window === "undefined") return { incoming: [], sent: [] };
+  try {
+    const cached = localStorage.getItem(`${REQUESTS_CACHE_KEY}-${walletAddress.toLowerCase()}`);
+    return cached ? JSON.parse(cached) : { incoming: [], sent: [] };
+  } catch {
+    return { incoming: [], sent: [] };
+  }
+}
+
+function setCachedRequests(walletAddress: string, incoming: PaymentRequest[], sent: PaymentRequest[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      `${REQUESTS_CACHE_KEY}-${walletAddress.toLowerCase()}`,
+      JSON.stringify({ incoming, sent })
+    );
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
 export function usePaymentRequests(currentWalletAddress: string | null) {
-  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
-  const [sentRequests, setSentRequests] = useState<PaymentRequest[]>([]);
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>(() => {
+    if (currentWalletAddress) {
+      return getCachedRequests(currentWalletAddress).incoming;
+    }
+    return [];
+  });
+  const [sentRequests, setSentRequests] = useState<PaymentRequest[]>(() => {
+    if (currentWalletAddress) {
+      return getCachedRequests(currentWalletAddress).sent;
+    }
+    return [];
+  });
   const [paymentRequestsError, setPaymentRequestsError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -44,42 +78,51 @@ export function usePaymentRequests(currentWalletAddress: string | null) {
     if (showRefreshIndicator) setIsRefreshing(true);
     setPaymentRequestsError(null);
     
+    let newIncoming: PaymentRequest[] = [];
+    let newSent: PaymentRequest[] = [];
+    
     try {
       const incomingResult = await getIncomingPaymentRequests(currentWalletAddress);
       if (incomingResult.error) {
         setPaymentRequestsError(incomingResult.error);
-        setPaymentRequests([]);
       } else {
-        setPaymentRequests(incomingResult.data || []);
+        newIncoming = incomingResult.data || [];
+        setPaymentRequests(newIncoming);
       }
 
       const profileResult = await getProfileIdByWallet(currentWalletAddress);
       if (profileResult.error) {
         console.error("Failed to load profile:", profileResult.error);
-        setSentRequests([]);
       } else if (profileResult.data) {
         const sentResult = await getSentPaymentRequests(profileResult.data.id);
         if (sentResult.error) {
           setPaymentRequestsError(prev => 
             prev ? `${prev}; Failed to load sent requests` : "Failed to load sent requests"
           );
-          setSentRequests([]);
         } else {
-          setSentRequests(sentResult.data || []);
+          newSent = sentResult.data || [];
+          setSentRequests(newSent);
         }
-      } else {
-        setSentRequests([]);
       }
+      
+      // Cache the results
+      setCachedRequests(currentWalletAddress, newIncoming, newSent);
     } finally {
       if (showRefreshIndicator) setIsRefreshing(false);
     }
   }, [currentWalletAddress]);
 
+  // Load from cache on mount, then refresh from server
   useEffect(() => {
     if (currentWalletAddress) {
+      const cached = getCachedRequests(currentWalletAddress);
+      if (cached.incoming.length > 0 || cached.sent.length > 0) {
+        setPaymentRequests(cached.incoming);
+        setSentRequests(cached.sent);
+      }
       loadPaymentRequests();
     }
-  }, [currentWalletAddress, loadPaymentRequests]);
+  }, [currentWalletAddress]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!currentWalletAddress) return;

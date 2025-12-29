@@ -12,7 +12,6 @@
   }
   .btn-primary:hover {
     background-color: var(--primary-600);
-    filter: brightness(1.1);
   }
   .btn-primary:disabled {
     background-color: var(--neutral-400);
@@ -37,7 +36,7 @@
     color: var(--success-foreground);
   }
   .btn-success:hover {
-    filter: brightness(1.1);
+    background-color: var(--success-600);
   }
   .btn-success:disabled {
     background-color: var(--neutral-400);
@@ -51,7 +50,7 @@
     color: var(--success-foreground);
   }
   .btn-success-sm:hover {
-    filter: brightness(1.1);
+    background-color: var(--success-600);
   }
   .btn-success-sm:disabled {
     background-color: var(--neutral-400);
@@ -76,7 +75,7 @@
     color: var(--primary-foreground);
   }
   .btn-primary-sm:hover {
-    filter: brightness(1.1);
+    background-color: var(--primary-600);
   }
   .btn-primary-sm:disabled {
     background-color: var(--neutral-400);
@@ -101,7 +100,7 @@
     color: var(--danger-foreground);
   }
   .btn-danger-sm:hover {
-    filter: brightness(1.1);
+    background-color: var(--danger-600);
   }
   .btn-danger-sm:disabled {
     background-color: var(--neutral-400);
