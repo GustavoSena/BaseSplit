@@ -381,10 +381,8 @@ return (
   <main className="main-container">
     <DesktopHeader activeTab={activeTab} onTabChange={handleTabChange} />
 
-    {/* Main Content */}
     <div className="content-area">
       <div className="content-wrapper">
-        {/* Balance Card */}
         <div className="balance-card">
           <div className="flex items-center justify-center gap-2 mb-2">
             <p className="wallet-address">
@@ -394,89 +392,71 @@ return (
               onClick={() => {
                 if (currentWalletAddress) navigator.clipboard.writeText(currentWalletAddress);
               }}
-              className="p-1 hover:bg-gray-700 rounded transition-colors"
+              className="p-1 hover:bg-neutral-200 dark:hover:bg-gray-700 rounded transition-colors"
               title="Copy address"
             >
-              <ClipboardIcon className="text-gray-500" />
+              <ClipboardIcon className="text-neutral-500" />
             </button>
-              <p className="wallet-address">
-                {currentWalletAddress?.slice(0, 6)}...{currentWalletAddress?.slice(-4)}
-              </p>
-              <button
-                onClick={() => {
-                  if (currentWalletAddress) navigator.clipboard.writeText(currentWalletAddress);
-                }}
-                className="p-1 hover:bg-gray-700 rounded transition-colors"
-                title="Copy address"
-              >
-                <ClipboardIcon className="text-gray-500" />
-              </button>
-            </div>
-            <p className="text-4xl font-bold text-white">${formattedBalance}</p>
-            <p className="text-gray-500 text-sm">USDC Balance</p>
           </div>
-
-          {/* Tab Content */}
-          {/* Contacts Tab */}
-          {activeTab === "contacts" && (
-            <ContactsTab 
-              currentWalletAddress={currentWalletAddress}
-              onSendMoney={(contact) => setSendMoneyContact(contact)}
-              onRequestMoney={handleRequestMoney}
-            />
-          )}
-
-          {/* Settings Tab */}
-          {activeTab === "settings" && (
-            <SettingsTab
-              isCDPSignedIn={isCDPSignedIn}
-              cdpAuth={cdpAuth}
-              walletAuth={walletAuth}
-              formattedSmartBalance={formattedSmartBalance}
-              formattedEoaBalance={formattedEoaBalance}
-            />
-          )}
-
-          {/* Requests Tab */}
-          {activeTab === "requests" && (
-            <RequestsTab
-              currentWalletAddress={currentWalletAddress}
-              contacts={contacts}
-              loadContacts={loadContacts}
-              payPaymentRequest={payPaymentRequest}
-              payingRequestId={payingRequestId}
-              isSending={isSending}
-              isConfirming={isConfirming}
-              prefilledContact={requestMoneyContact}
-              onPrefilledContactUsed={clearPrefilledContact}
-              onSendMoney={(toAddress: string, amount: number, memo?: string) => sendMoneyFromRequests(toAddress, amount, memo)}
-            />
-          )}
+          <p className="text-4xl font-bold text-foreground">${formattedBalance}</p>
+          <p className="text-muted-foreground text-sm">USDC Balance</p>
         </div>
-      </div>  
 
-      <MobileNav activeTab={activeTab} onTabChange={handleTabChange} />
+        {activeTab === "contacts" && (
+          <ContactsTab 
+            currentWalletAddress={currentWalletAddress}
+            onSendMoney={(contact) => setSendMoneyContact(contact)}
+            onRequestMoney={handleRequestMoney}
+          />
+        )}
 
-      {/* Send Money Modal */}
-      {sendMoneyContact && (
-        <SendMoneyModal
-          contact={sendMoneyContact}
-          onClose={() => setSendMoneyContact(null)}
-          onSend={sendDirectMoney}
-          isSending={isSending}
-          isConfirming={isConfirming}
-        />
-      )}
+        {activeTab === "settings" && (
+          <SettingsTab
+            isCDPSignedIn={isCDPSignedIn}
+            cdpAuth={cdpAuth}
+            walletAuth={walletAuth}
+            formattedSmartBalance={formattedSmartBalance}
+            formattedEoaBalance={formattedEoaBalance}
+          />
+        )}
 
-      {/* Request Money Modal */}
-      {requestModalContact && (
-        <RequestMoneyModal
-          contact={requestModalContact}
-          onClose={() => setRequestModalContact(null)}
-          onRequest={createRequestFromModal}
-          isSubmitting={isCreatingRequest}
-        />
-      )}
-    </main>
-  );
+        {activeTab === "requests" && (
+          <RequestsTab
+            currentWalletAddress={currentWalletAddress}
+            contacts={contacts}
+            loadContacts={loadContacts}
+            payPaymentRequest={payPaymentRequest}
+            payingRequestId={payingRequestId}
+            isSending={isSending}
+            isConfirming={isConfirming}
+            prefilledContact={requestMoneyContact}
+            onPrefilledContactUsed={clearPrefilledContact}
+            onSendMoney={(toAddress: string, amount: number, memo?: string) => sendMoneyFromRequests(toAddress, amount, memo)}
+          />
+        )}
+      </div>
+    </div>
+
+    <MobileNav activeTab={activeTab} onTabChange={handleTabChange} />
+
+    {sendMoneyContact && (
+      <SendMoneyModal
+        contact={sendMoneyContact}
+        onClose={() => setSendMoneyContact(null)}
+        onSend={sendDirectMoney}
+        isSending={isSending}
+        isConfirming={isConfirming}
+      />
+    )}
+
+    {requestModalContact && (
+      <RequestMoneyModal
+        contact={requestModalContact}
+        onClose={() => setRequestModalContact(null)}
+        onRequest={createRequestFromModal}
+        isSubmitting={isCreatingRequest}
+      />
+    )}
+  </main>
+);
 }
