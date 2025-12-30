@@ -18,6 +18,7 @@ import {
   updateHistoryFilterPreference,
   createContact,
 } from "@/lib/supabase/queries";
+import { REQUESTS_CACHE_KEY, limitCacheSize } from "@/lib/cache";
 
 interface RequestsTabProps {
   currentWalletAddress: string | null;
@@ -31,8 +32,6 @@ interface RequestsTabProps {
   onPrefilledContactUsed?: () => void;
   onSendMoney?: (toAddress: string, amount: number, memo?: string) => void;
 }
-
-const REQUESTS_CACHE_KEY = "basesplit-requests";
 
 function getCachedRequests(walletAddress: string): { incoming: PaymentRequest[]; sent: PaymentRequest[] } {
   if (typeof window === "undefined") return { incoming: [], sent: [] };
@@ -49,7 +48,10 @@ function setCachedRequests(walletAddress: string, incoming: PaymentRequest[], se
   try {
     localStorage.setItem(
       `${REQUESTS_CACHE_KEY}-${walletAddress.toLowerCase()}`,
-      JSON.stringify({ incoming, sent })
+      JSON.stringify({ 
+        incoming: limitCacheSize(incoming), 
+        sent: limitCacheSize(sent) 
+      })
     );
   } catch {
     // Ignore localStorage errors
@@ -175,6 +177,7 @@ export function RequestsTab({
   // History state
   const [showHistory, setShowHistory] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilterType>("all");
+  const [historyDisplayCount, setHistoryDisplayCount] = useState(20);
 
   // Save as contact state (for pending requests)
   const [saveAsContactId, setSaveAsContactId] = useState<string | null>(null);
@@ -609,7 +612,12 @@ export function RequestsTab({
               return <p className="text-muted">No history yet</p>;
             }
 
-            return allHistory.map((pr) => {
+            const displayedHistory = allHistory.slice(0, historyDisplayCount);
+            const hasMore = allHistory.length > historyDisplayCount;
+
+            return (
+              <>
+                {displayedHistory.map((pr) => {
               const amountUSDC = (Number(pr.amount) / 1e6).toFixed(2);
               const balanceChange = pr.direction === "sent" ? `+$${amountUSDC}` : `-$${amountUSDC}`;
               const balanceColor = pr.direction === "sent" ? "text-success-500" : "text-danger-500";
@@ -656,7 +664,17 @@ export function RequestsTab({
                   )}
                 </div>
               );
-            });
+            })}
+                {hasMore && (
+                  <button
+                    onClick={() => setHistoryDisplayCount(prev => prev + 20)}
+                    className="w-full py-2 text-sm text-primary-500 hover:text-primary-400 transition-colors"
+                  >
+                    Load More ({allHistory.length - historyDisplayCount} remaining)
+                  </button>
+                )}
+              </>
+            );
           })()}
         </div>
       )}

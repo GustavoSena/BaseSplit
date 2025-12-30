@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useIsSignedIn, useSignOut, useCurrentUser } from "@coinbase/cdp-hooks";
 import { supabase } from "@/lib/supabase/client";
+import { clearAllCache } from "@/lib/cache";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 
 type AuthStatus = "signed_out" | "signing_in" | "signed_in";
@@ -127,6 +128,7 @@ export function useCDPAuth() {
     try {
       await cdpSignOut();
       await supabase.auth.signOut();
+      clearAllCache();
       setStatus("signed_out");
       setSession(null);
       setUser(null);

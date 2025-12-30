@@ -9,14 +9,13 @@ import {
   createContact,
   deleteContact as deleteContactQuery,
 } from "@/lib/supabase/queries";
+import { CONTACTS_CACHE_KEY, limitCacheSize } from "@/lib/cache";
 
 interface ContactsTabProps {
   currentWalletAddress: string | null;
   onSendMoney?: (contact: Contact) => void;
   onRequestMoney?: (contact: Contact) => void;
 }
-
-const CONTACTS_CACHE_KEY = "basesplit-contacts";
 
 /**
  * Loads and exposes contacts associated with the given wallet address.
@@ -64,11 +63,11 @@ export function useContacts(currentWalletAddress: string | null) {
       } else {
         const newContacts = contactsResult.data || [];
         setContacts(newContacts);
-        // Cache to localStorage
+        // Cache to localStorage (limited to 20 items)
         try {
           localStorage.setItem(
             `${CONTACTS_CACHE_KEY}-${currentWalletAddress.toLowerCase()}`,
-            JSON.stringify(newContacts)
+            JSON.stringify(limitCacheSize(newContacts))
           );
         } catch {
           // Ignore localStorage errors
@@ -132,6 +131,9 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  
+  // Pagination state
+  const [contactsDisplayCount, setContactsDisplayCount] = useState(20);
 
   const handleDeleteContact = async (contactId: string) => {
     setIsDeleting(true);
@@ -235,7 +237,7 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
 
       {contacts.length > 0 ? (
         <div className="card space-y-2">
-          {contacts.map((c) => (
+          {contacts.slice(0, contactsDisplayCount).map((c) => (
             <div key={c.id} className="list-item-compact">
               <div className="flex justify-between items-start">
                 <div className="flex-1 min-w-0">
@@ -309,6 +311,14 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
               )}
             </div>
           ))}
+          {contacts.length > contactsDisplayCount && (
+            <button
+              onClick={() => setContactsDisplayCount(prev => prev + 20)}
+              className="w-full py-2 text-sm text-primary-500 hover:text-primary-400 transition-colors"
+            >
+              Load More ({contacts.length - contactsDisplayCount} remaining)
+            </button>
+          )}
         </div>
       ) : (
         <p className="text-muted">No contacts yet</p>

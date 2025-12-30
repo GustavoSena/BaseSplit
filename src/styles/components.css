@@ -16,7 +16,7 @@
   .btn-primary:disabled {
     background-color: var(--neutral-400);
     cursor: not-allowed;
-    filter: none;
+    opacity: 0.5;
   }
   
   /* Secondary button - cancel, back actions */
@@ -41,7 +41,7 @@
   .btn-success:disabled {
     background-color: var(--neutral-400);
     cursor: not-allowed;
-    filter: none;
+    opacity: 0.5;
   }
   
   .btn-success-sm {
@@ -55,17 +55,22 @@
   .btn-success-sm:disabled {
     background-color: var(--neutral-400);
     cursor: not-allowed;
+    opacity: 0.5;
   }
   
-  /* Danger button - destructive actions */
+  /* Danger button - destructive actions (solid style) */
   .btn-danger {
     @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-all duration-200;
-    background-color: var(--danger-50);
-    color: var(--danger-400);
-    border: 1px solid var(--danger-200);
+    background-color: var(--danger);
+    color: var(--danger-foreground);
   }
   .btn-danger:hover {
-    background-color: var(--danger-100);
+    background-color: var(--danger-600);
+  }
+  .btn-danger:disabled {
+    background-color: var(--neutral-400);
+    cursor: not-allowed;
+    opacity: 0.5;
   }
   
   /* Primary button small */
@@ -352,7 +357,8 @@
     border: 1px solid var(--neutral-400);
   }
   .history-filter-select:focus {
-    ring-color: var(--primary);
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
   }
 
   /* ==================== LAYOUT ==================== */
@@ -404,7 +410,7 @@
   
   .modal-overlay {
     @apply fixed inset-0 flex items-center justify-center z-50 p-4;
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: var(--overlay);
   }
   
   .modal-content {

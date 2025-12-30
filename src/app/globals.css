@@ -97,6 +97,7 @@
   --ring: #3b82f6;
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
+  --overlay: rgba(15, 23, 42, 0.7);
   
   /* Text */
   --text-primary: #0f172a;
@@ -181,6 +182,7 @@
   --ring: #3b82f6;
   --muted: #334155;
   --muted-foreground: #94a3b8;
+  --overlay: rgba(0, 0, 0, 0.8);
   
   /* Text */
   --text-primary: #f1f5f9;
