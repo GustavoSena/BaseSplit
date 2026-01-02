@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { base } from "viem/chains";
 import { Name } from "@coinbase/onchainkit/identity";
 import { RefreshIcon, ChevronDownIcon } from "./Icons";
@@ -114,7 +114,7 @@ export function usePaymentRequests(currentWalletAddress: string | null) {
     }
   }, [currentWalletAddress]);
 
-  // Load from cache on mount, then refresh from server
+  // Hydrate from cache on mount/wallet change for instant UI
   useEffect(() => {
     if (currentWalletAddress) {
       const cached = getCachedRequests(currentWalletAddress);
@@ -122,9 +122,15 @@ export function usePaymentRequests(currentWalletAddress: string | null) {
         setPaymentRequests(cached.incoming);
         setSentRequests(cached.sent);
       }
+    }
+  }, [currentWalletAddress]);
+
+  // Refresh from server after cache hydration
+  useEffect(() => {
+    if (currentWalletAddress) {
       loadPaymentRequests();
     }
-  }, [currentWalletAddress]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentWalletAddress, loadPaymentRequests]);
 
   useEffect(() => {
     if (!currentWalletAddress) return;
@@ -235,6 +241,38 @@ export function RequestsTab({
     const contact = contacts.find(c => c.contact_wallet_address.toLowerCase() === address.toLowerCase());
     return contact?.label || null;
   }, [contacts]);
+
+  // Memoize history computation for performance
+  const allHistory = useMemo(() => {
+    const completedIncoming = paymentRequests.filter(pr => pr.status !== "pending");
+    const completedSent = sentRequests.filter(pr => pr.status !== "pending");
+    const allHistoryRaw = [
+      ...completedIncoming.map(pr => ({ ...pr, direction: "received" as const })),
+      ...completedSent.map(pr => ({ ...pr, direction: "sent" as const })),
+    ];
+    const seenIds = new Set<string>();
+    return allHistoryRaw
+      .filter(pr => {
+        if (seenIds.has(pr.id)) return false;
+        seenIds.add(pr.id);
+        return true;
+      })
+      .filter(pr => {
+        if (historyFilter === "all") return true;
+        const otherAddress = pr.direction === "sent" 
+          ? pr.payer_wallet_address 
+          : pr.profiles?.wallet_address;
+        const isContactAddress = isContact(otherAddress);
+        if (historyFilter === "contacts-only") return isContactAddress;
+        if (historyFilter === "external-only") return !isContactAddress;
+        return true;
+      })
+      .sort((a, b) => {
+        const dateA = a.status === "paid" && a.paid_at ? a.paid_at : a.created_at;
+        const dateB = b.status === "paid" && b.paid_at ? b.paid_at : b.created_at;
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      });
+  }, [paymentRequests, sentRequests, historyFilter, isContact]);
 
   const handleSaveAsContact = async (walletAddress: string) => {
     if (!currentWalletAddress || !saveAsContactLabel.trim()) return;
@@ -578,139 +616,129 @@ export function RequestsTab({
               <option value="external-only">External Only</option>
             </select>
           </div>
-          {(() => {
-            const completedIncoming = paymentRequests.filter(pr => pr.status !== "pending");
-            const completedSent = sentRequests.filter(pr => pr.status !== "pending");
-            const allHistoryRaw = [
-              ...completedIncoming.map(pr => ({ ...pr, direction: "received" as const })),
-              ...completedSent.map(pr => ({ ...pr, direction: "sent" as const })),
-            ];
-            const seenIds = new Set<string>();
-            const allHistory = allHistoryRaw
-              .filter(pr => {
-                if (seenIds.has(pr.id)) return false;
-                seenIds.add(pr.id);
-                return true;
-              })
-              .filter(pr => {
-                if (historyFilter === "all") return true;
-                const otherAddress = pr.direction === "sent" 
-                  ? pr.payer_wallet_address 
-                  : pr.profiles?.wallet_address;
-                const isContactAddress = isContact(otherAddress);
-                if (historyFilter === "contacts-only") return isContactAddress;
-                if (historyFilter === "external-only") return !isContactAddress;
-                return true;
-              })
-              .sort((a, b) => {
-                const dateA = a.status === "paid" && a.paid_at ? a.paid_at : a.created_at;
-                const dateB = b.status === "paid" && b.paid_at ? b.paid_at : b.created_at;
-                return new Date(dateB).getTime() - new Date(dateA).getTime();
-              });
+          {allHistory.length === 0 ? (
+            <p className="text-muted">No history yet</p>
+          ) : (
+            <>
+              {allHistory.slice(0, historyDisplayCount).map((pr) => {
+                const amountUSDC = (Number(pr.amount) / 1e6).toFixed(2);
+                const balanceChange = pr.direction === "sent" ? `+$${amountUSDC}` : `-$${amountUSDC}`;
+                const balanceColor = pr.direction === "sent" ? "text-success-500" : "text-danger-500";
+                const otherAddress = pr.direction === "sent" ? pr.payer_wallet_address : pr.profiles?.wallet_address;
+                const contactLabel = getContactLabel(otherAddress);
+                const displayName = contactLabel || (otherAddress ? `${otherAddress.slice(0, 6)}...${otherAddress.slice(-4)}` : "Unknown");
 
-            if (allHistory.length === 0) {
-              return <p className="text-muted">No history yet</p>;
-            }
-
-            const displayedHistory = allHistory.slice(0, historyDisplayCount);
-            const hasMore = allHistory.length > historyDisplayCount;
-
-            return (
-              <>
-                {displayedHistory.map((pr) => {
-                  const amountUSDC = (Number(pr.amount) / 1e6).toFixed(2);
-                  const balanceChange = pr.direction === "sent" ? `+$${amountUSDC}` : `-$${amountUSDC}`;
-                  const balanceColor = pr.direction === "sent" ? "text-success-500" : "text-danger-500";
-                  const otherAddress = pr.direction === "sent" ? pr.payer_wallet_address : pr.profiles?.wallet_address;
-                  const contactLabel = getContactLabel(otherAddress);
-                  const displayName = contactLabel || (otherAddress ? `${otherAddress.slice(0, 6)}...${otherAddress.slice(-4)}` : "Unknown");
-
-                  return (
-                    <div key={pr.id} className="list-item">
-                      {/* Main row with grid layout */}
-                      <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 items-start">
-                        {/* Row 1, Column 1: Direction */}
-                        <div className="min-w-0">
-                          <span className={`text-xs whitespace-nowrap ${pr.direction === "sent" ? "text-primary-500" : "text-primary-400"}`}>
-                            {pr.direction === "sent" ? "↑ Sent Request" : "↓ Received Request"}
-                          </span>
-                        </div>
-                        
-                        {/* Row 1, Column 2: Amount */}
-                        <div className="text-right whitespace-nowrap">
-                          <span className="font-medium">{amountUSDC} USDC</span>
-                        </div>
-                        
-                        {/* Row 1, Column 3: Status */}
-                        <div className="w-20 text-right">
-                          <span className={
-                            pr.status === "paid" ? "badge-paid" :
-                            pr.status === "rejected" ? "badge-rejected" :
-                            pr.status === "cancelled" ? "badge-cancelled" :
-                            "badge-pending"
-                          }>{pr.status}</span>
-                        </div>
-                        
-                        {/* Row 2, Column 1: Address/Contact */}
-                        <div className="min-w-0 truncate text-sm">
-                          <span className="text-muted-foreground">
-                            {pr.direction === "sent" ? "To: " : "From: "}
-                          </span>
-                          <span className={contactLabel ? "font-medium" : "font-mono text-muted-foreground"}>
-                            {displayName}
-                          </span>
-                          {contactLabel && otherAddress && (
-                            <span className="text-xs text-muted-foreground ml-1 font-mono">
-                              ({otherAddress.slice(0, 6)}...{otherAddress.slice(-4)})
-                            </span>
-                          )}
-                        </div>
-                        
-                        {/* Row 2, Column 2: Empty or memo placeholder */}
-                        <div></div>
-                        
-                        {/* Row 2, Column 3: Balance change (under status) */}
-                        <div className="w-20 text-right">
-                          {pr.status === "paid" && (
-                            <span className={`text-xs font-medium ${balanceColor}`}>
-                              {balanceChange}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Memo and transaction link row */}
-                      {(pr.memo || pr.tx_hash) && (
-                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                          {pr.memo && <span>{pr.memo}</span>}
-                          {pr.tx_hash && (
-                            <a 
-                              href={`https://basescan.org/tx/${pr.tx_hash}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary-500 hover:underline"
-                            >
-                              View transaction
-                            </a>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {hasMore && (
-                  <button
-                    onClick={() => setHistoryDisplayCount(prev => prev + 20)}
-                    className="w-full py-2 text-sm text-primary-500 hover:text-primary-400 transition-colors"
-                  >
-                    Load More ({allHistory.length - historyDisplayCount} remaining)
-                  </button>
-                )}
-              </>
-            );
-          })()}
+                return (
+                  <HistoryItem
+                    key={pr.id}
+                    pr={pr}
+                    amountUSDC={amountUSDC}
+                    balanceChange={balanceChange}
+                    balanceColor={balanceColor}
+                    contactLabel={contactLabel}
+                    displayName={displayName}
+                    otherAddress={otherAddress}
+                  />
+                );
+              })}
+              {allHistory.length > historyDisplayCount && (
+                <button
+                  onClick={() => setHistoryDisplayCount(prev => prev + 20)}
+                  className="w-full py-2 text-sm text-primary-500 hover:text-primary-400 transition-colors"
+                >
+                  Load More ({allHistory.length - historyDisplayCount} remaining)
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
     </>
+  );
+}
+
+// Extracted history item component for better maintainability
+interface HistoryItemProps {
+  pr: PaymentRequest & { direction: "sent" | "received" };
+  amountUSDC: string;
+  balanceChange: string;
+  balanceColor: string;
+  contactLabel: string | null;
+  displayName: string;
+  otherAddress: string | undefined;
+}
+
+function HistoryItem({ pr, amountUSDC, balanceChange, balanceColor, contactLabel, displayName, otherAddress }: HistoryItemProps) {
+  return (
+    <div className="list-item">
+      {/* Main row with grid layout */}
+      <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 items-start">
+        {/* Row 1, Column 1: Direction */}
+        <div className="min-w-0">
+          <span className={`text-xs whitespace-nowrap ${pr.direction === "sent" ? "text-primary-500" : "text-primary-400"}`}>
+            {pr.direction === "sent" ? "↑ Sent Request" : "↓ Received Request"}
+          </span>
+        </div>
+        
+        {/* Row 1, Column 2: Amount */}
+        <div className="text-right whitespace-nowrap">
+          <span className="font-medium">{amountUSDC} USDC</span>
+        </div>
+        
+        {/* Row 1, Column 3: Status */}
+        <div className="w-20 text-right">
+          <span className={
+            pr.status === "paid" ? "badge-paid" :
+            pr.status === "rejected" ? "badge-rejected" :
+            pr.status === "cancelled" ? "badge-cancelled" :
+            "badge-pending"
+          }>{pr.status}</span>
+        </div>
+        
+        {/* Row 2, Column 1: Address/Contact */}
+        <div className="min-w-0 truncate text-sm flex items-center">
+          <span className="text-muted-foreground w-12 flex-shrink-0">
+            {pr.direction === "sent" ? "To:" : "From:"}
+          </span>
+          <span className={contactLabel ? "font-medium" : "font-mono text-muted-foreground"}>
+            {displayName}
+          </span>
+          {contactLabel && otherAddress && (
+            <span className="text-xs text-muted-foreground ml-1 font-mono">
+              ({otherAddress.slice(0, 6)}...{otherAddress.slice(-4)})
+            </span>
+          )}
+        </div>
+        
+        {/* Row 2, Column 2: Empty */}
+        <div></div>
+        
+        {/* Row 2, Column 3: Balance change (under status) */}
+        <div className="w-20 text-right">
+          {pr.status === "paid" && (
+            <span className={`text-xs font-medium ${balanceColor}`}>
+              {balanceChange}
+            </span>
+          )}
+        </div>
+      </div>
+      
+      {/* Memo and transaction link row */}
+      {(pr.memo || pr.tx_hash) && (
+        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+          {pr.memo && <span>{pr.memo}</span>}
+          {pr.tx_hash && (
+            <a 
+              href={`https://basescan.org/tx/${pr.tx_hash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary-500 hover:underline"
+            >
+              View transaction
+            </a>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
