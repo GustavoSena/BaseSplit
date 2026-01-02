@@ -9,6 +9,7 @@ import {
   createContact,
   deleteContact as deleteContactQuery,
 } from "@/lib/supabase/queries";
+import { CONTACTS_CACHE_KEY, limitCacheSize } from "@/lib/cache";
 
 interface ContactsTabProps {
   currentWalletAddress: string | null;
@@ -26,11 +27,26 @@ interface ContactsTabProps {
  *  - `loadContacts`: a function to re-fetch the contacts for the current `currentWalletAddress`.
  */
 export function useContacts(currentWalletAddress: string | null) {
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>(() => {
+    // Initialize from localStorage cache
+    if (typeof window !== "undefined" && currentWalletAddress) {
+      try {
+        const cached = localStorage.getItem(`${CONTACTS_CACHE_KEY}-${currentWalletAddress.toLowerCase()}`);
+        return cached ? JSON.parse(cached) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
   const [contactsError, setContactsError] = useState<string | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  const loadContacts = useCallback(async () => {
+  const loadContacts = useCallback(async (forceRefresh = false) => {
     if (!currentWalletAddress) return;
+
+    // Skip if already loaded and not forcing refresh
+    if (hasLoadedOnce && !forceRefresh && contacts.length > 0) return;
 
     setContactsError(null);
     try {
@@ -45,19 +61,48 @@ export function useContacts(currentWalletAddress: string | null) {
         setContactsError(contactsResult.error);
         setContacts([]);
       } else {
-        setContacts(contactsResult.data || []);
+        const newContacts = contactsResult.data || [];
+        setContacts(newContacts);
+        // Cache to localStorage (limited to 20 items)
+        try {
+          localStorage.setItem(
+            `${CONTACTS_CACHE_KEY}-${currentWalletAddress.toLowerCase()}`,
+            JSON.stringify(limitCacheSize(newContacts))
+          );
+        } catch {
+          // Ignore localStorage errors
+        }
       }
+      setHasLoadedOnce(true);
     } catch (err) {
       setContactsError(err instanceof Error ? err.message : "Failed to load contacts");
       setContacts([]);
     }
-  }, [currentWalletAddress]);
+  }, [currentWalletAddress, hasLoadedOnce, contacts.length]);
 
+  // Load on mount or wallet change
   useEffect(() => {
-    loadContacts();
+    if (currentWalletAddress) {
+      // Load from cache first
+      try {
+        const cached = localStorage.getItem(`${CONTACTS_CACHE_KEY}-${currentWalletAddress.toLowerCase()}`);
+        if (cached) {
+          setContacts(JSON.parse(cached));
+        }
+      } catch {
+        // Ignore
+      }
+      // Then refresh from server
+      loadContacts(true);
+    }
+  }, [currentWalletAddress]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Force refresh function for when contacts are added/deleted
+  const refreshContacts = useCallback(() => {
+    return loadContacts(true);
   }, [loadContacts]);
 
-  return { contacts, contactsError, loadContacts };
+  return { contacts, contactsError, loadContacts: refreshContacts };
 }
 
 /**
@@ -86,6 +131,9 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  
+  // Pagination state
+  const [contactsDisplayCount, setContactsDisplayCount] = useState(20);
 
   const handleDeleteContact = async (contactId: string) => {
     setIsDeleting(true);
@@ -189,7 +237,7 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
 
       {contacts.length > 0 ? (
         <div className="card space-y-2">
-          {contacts.map((c) => (
+          {contacts.slice(0, contactsDisplayCount).map((c) => (
             <div key={c.id} className="list-item-compact">
               <div className="flex justify-between items-start">
                 <div className="flex-1 min-w-0">
@@ -199,7 +247,7 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
                       {c.contact_wallet_address.slice(0, 6)}...{c.contact_wallet_address.slice(-4)}
                     </span>
                   </div>
-                  {c.note && <p className="text-gray-400 text-xs mt-1">{c.note}</p>}
+                  {c.note && <p className="text-muted-foreground text-xs mt-1">{c.note}</p>}
                 </div>
                 
                 {/* Action buttons */}
@@ -208,7 +256,7 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
                     <button
                       type="button"
                       onClick={() => onSendMoney(c)}
-                      className="p-1.5 text-green-400 hover:bg-green-900/30 rounded transition-colors"
+                      className="p-1.5 text-success-500 hover:bg-success-100 dark:hover:bg-success-900/30 rounded transition-colors"
                       title="Send money"
                     >
                       <SendIcon size="sm" />
@@ -218,7 +266,7 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
                     <button
                       type="button"
                       onClick={() => onRequestMoney(c)}
-                      className="p-1.5 text-blue-400 hover:bg-blue-900/30 rounded transition-colors"
+                      className="p-1.5 text-primary-500 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded transition-colors"
                       title="Request money"
                     >
                       <RequestIcon size="sm" />
@@ -227,7 +275,7 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
                   <button
                     type="button"
                     onClick={() => setDeleteConfirmId(c.id)}
-                    className="p-1.5 text-red-400 hover:bg-red-900/30 rounded transition-colors"
+                    className="p-1.5 text-danger-500 hover:bg-danger-100 dark:hover:bg-danger-900/30 rounded transition-colors"
                     title="Delete contact"
                   >
                     <TrashIcon size="sm" />
@@ -237,24 +285,24 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
               
               {/* Delete confirmation */}
               {deleteConfirmId === c.id && (
-                <div className="mt-2 p-2 bg-red-900/20 border border-red-800 rounded">
-                  <p className="text-sm text-red-300 mb-2">Delete "{c.label}"?</p>
+                <div className="mt-2 p-2 bg-danger-100 dark:bg-danger-900/20 border border-danger-300 dark:border-danger-800 rounded">
+                  <p className="text-sm text-danger-600 dark:text-danger-300 mb-2">Delete "{c.label}"?</p>
                   {deleteError && (
-                    <p className="text-red-400 text-xs mb-2">{deleteError}</p>
+                    <p className="text-danger-500 text-xs mb-2">{deleteError}</p>
                   )}
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => handleDeleteContact(c.id)}
                       disabled={isDeleting}
-                      className="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
+                      className="btn-danger-sm"
                     >
                       {isDeleting ? "Deleting..." : "Delete"}
                     </button>
                     <button
                       type="button"
                       onClick={() => { setDeleteConfirmId(null); setDeleteError(null); }}
-                      className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                      className="btn-secondary-sm"
                     >
                       Cancel
                     </button>
@@ -263,6 +311,14 @@ export function ContactsTab({ currentWalletAddress, onSendMoney, onRequestMoney 
               )}
             </div>
           ))}
+          {contacts.length > contactsDisplayCount && (
+            <button
+              onClick={() => setContactsDisplayCount(prev => prev + 20)}
+              className="w-full py-2 text-sm text-primary-500 hover:text-primary-400 transition-colors"
+            >
+              Load More ({contacts.length - contactsDisplayCount} remaining)
+            </button>
+          )}
         </div>
       ) : (
         <p className="text-muted">No contacts yet</p>

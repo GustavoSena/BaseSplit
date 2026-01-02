@@ -1,133 +1,371 @@
 /* Component Styles for BaseSplit */
+/* Using CSS variables for theme-aware styling */
 
 @layer components {
   /* ==================== BUTTONS ==================== */
   
-  /* Primary button (blue) */
+  /* Primary button - main actions */
   .btn-primary {
-    @apply py-2 px-4 font-semibold rounded-lg transition-colors bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
+    @apply py-2 px-4 font-semibold rounded-lg transition-all duration-200;
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .btn-primary:hover {
+    background-color: var(--primary-600);
+  }
+  .btn-primary:disabled {
+    background-color: var(--neutral-400);
+    cursor: not-allowed;
+    opacity: 0.5;
   }
   
-  /* Secondary button (purple) */
+  /* Secondary button - cancel, back actions */
   .btn-secondary {
-    @apply py-2 px-4 font-semibold rounded-lg transition-colors bg-purple-600 hover:bg-purple-700 text-white;
+    @apply py-2 px-4 font-semibold rounded-lg transition-all duration-200;
+    background-color: var(--neutral-300);
+    color: var(--text-primary);
+  }
+  .btn-secondary:hover {
+    background-color: var(--neutral-400);
   }
   
-  /* Success button (green) */
+  /* Success button - positive actions (request money, pay) */
   .btn-success {
-    @apply py-2 px-4 font-semibold rounded-lg transition-colors bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
+    @apply py-2 px-4 font-semibold rounded-lg transition-all duration-200;
+    background-color: var(--success);
+    color: var(--success-foreground);
+  }
+  .btn-success:hover {
+    background-color: var(--success-600);
+  }
+  .btn-success:disabled {
+    background-color: var(--neutral-400);
+    cursor: not-allowed;
+    opacity: 0.5;
   }
   
   .btn-success-sm {
-    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-colors bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white;
+    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-all duration-200;
+    background-color: var(--success);
+    color: var(--success-foreground);
+  }
+  .btn-success-sm:hover {
+    background-color: var(--success-600);
+  }
+  .btn-success-sm:disabled {
+    background-color: var(--neutral-400);
+    cursor: not-allowed;
+    opacity: 0.5;
   }
   
-  /* Danger button (red) */
+  /* Danger button - destructive actions (solid style) */
   .btn-danger {
-    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-colors bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/30;
+    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-all duration-200;
+    background-color: var(--danger);
+    color: var(--danger-foreground);
+  }
+  .btn-danger:hover {
+    background-color: var(--danger-600);
+  }
+  .btn-danger:disabled {
+    background-color: var(--neutral-400);
+    cursor: not-allowed;
+    opacity: 0.5;
   }
   
-  /* Ghost button (gray) */
+  /* Primary button small */
+  .btn-primary-sm {
+    @apply py-1 px-3 text-xs font-medium rounded transition-all duration-200;
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .btn-primary-sm:hover {
+    background-color: var(--primary-600);
+  }
+  .btn-primary-sm:disabled {
+    background-color: var(--neutral-400);
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  
+  /* Secondary button small */
+  .btn-secondary-sm {
+    @apply py-1 px-3 text-xs font-medium rounded transition-all duration-200;
+    background-color: var(--neutral-300);
+    color: var(--text-primary);
+  }
+  .btn-secondary-sm:hover {
+    background-color: var(--neutral-400);
+  }
+  
+  /* Danger button small */
+  .btn-danger-sm {
+    @apply py-1 px-3 text-xs font-medium rounded transition-all duration-200;
+    background-color: var(--danger);
+    color: var(--danger-foreground);
+  }
+  .btn-danger-sm:hover {
+    background-color: var(--danger-600);
+  }
+  .btn-danger-sm:disabled {
+    background-color: var(--neutral-400);
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  
+  /* Ghost button - subtle actions */
   .btn-ghost {
-    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-colors bg-gray-700 hover:bg-gray-600 text-gray-300;
+    @apply py-1.5 px-3 text-sm font-medium rounded-lg transition-all duration-200;
+    background-color: var(--neutral-300);
+    color: var(--text-secondary);
+  }
+  .btn-ghost:hover {
+    background-color: var(--neutral-400);
   }
   
   /* Icon button */
   .btn-icon {
-    @apply p-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 text-gray-300 rounded-lg transition-colors;
+    @apply p-2 rounded-lg transition-all duration-200;
+    background-color: var(--neutral-300);
+    color: var(--text-secondary);
+  }
+  .btn-icon:hover {
+    background-color: var(--neutral-400);
+  }
+  .btn-icon:disabled {
+    background-color: var(--neutral-200);
+    cursor: not-allowed;
   }
   
   /* Nav buttons */
   .btn-nav-active {
-    @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-600 text-white;
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors;
+    background-color: var(--primary);
+    color: var(--primary-foreground);
   }
   
   .btn-nav-inactive {
-    @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-700;
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors;
+    color: var(--text-muted);
+  }
+  .btn-nav-inactive:hover {
+    color: var(--text-primary);
+    background-color: var(--neutral-300);
   }
 
   /* ==================== INPUTS ==================== */
   
   .input {
-    @apply w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500;
+    @apply w-full px-3 py-2 rounded-lg text-sm transition-all duration-200;
+    background-color: var(--input);
+    border: 1px solid var(--input-border);
+    color: var(--text-primary);
+  }
+  .input::placeholder {
+    color: var(--text-muted);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--input-focus);
+    box-shadow: 0 0 0 2px var(--primary-100);
   }
 
   /* ==================== CARDS ==================== */
   
   .card {
-    @apply bg-gray-900 rounded-lg p-4 space-y-3;
+    @apply rounded-xl p-4 space-y-3 transition-colors duration-200;
+    background-color: var(--card);
+    border: 1px solid var(--border);
   }
   
   .card-title {
-    @apply text-sm text-gray-400 font-medium;
+    @apply text-sm font-medium;
+    color: var(--text-secondary);
   }
   
   .balance-card {
-    @apply bg-gray-800 rounded-2xl p-6 text-center;
+    @apply rounded-2xl p-6 text-center;
+    background-color: var(--card);
+    border: 1px solid var(--border);
   }
 
   /* ==================== STATUS BADGES ==================== */
   
   .badge-pending {
-    @apply text-xs px-2 py-0.5 rounded bg-yellow-800 text-yellow-300;
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+    background-color: var(--warning-100);
+    color: var(--warning-500);
   }
   
   .badge-sent {
-    @apply text-xs px-2 py-0.5 rounded bg-blue-800 text-blue-300;
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+    background-color: var(--primary-100);
+    color: var(--primary-500);
   }
   
   .badge-paid {
-    @apply text-xs px-2 py-0.5 rounded bg-green-800 text-green-300;
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+    background-color: var(--success-100);
+    color: var(--success-500);
   }
   
   .badge-rejected {
-    @apply text-xs px-2 py-0.5 rounded bg-orange-800 text-orange-300;
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+    background-color: var(--danger-100);
+    color: var(--danger-400);
   }
   
   .badge-cancelled {
-    @apply text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400;
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+    background-color: var(--neutral-200);
+    color: var(--text-muted);
   }
 
   /* ==================== LIST ITEMS ==================== */
   
   .list-item {
-    @apply text-white text-sm border-b border-gray-700 pb-3 last:border-0;
+    @apply text-sm pb-3 last:border-0;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border);
   }
   
   .list-item-compact {
-    @apply text-white text-sm border-b border-gray-700 pb-2 last:border-0;
+    @apply text-sm pb-2 last:border-0;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border);
   }
 
   /* ==================== TEXT STYLES ==================== */
   
+  /* Theme-aware text colors */
+  .text-theme-primary {
+    color: var(--text-primary);
+  }
+  
+  .text-theme-secondary {
+    color: var(--text-secondary);
+  }
+  
+  .text-theme-muted {
+    color: var(--text-muted);
+  }
+  
+  .text-theme-inverse {
+    color: var(--text-inverse);
+  }
+  
+  .text-theme-danger {
+    color: var(--danger-400);
+  }
+  
+  .text-theme-success {
+    color: var(--success-400);
+  }
+  
+  .text-theme-warning {
+    color: var(--warning-400);
+  }
+  
   .text-error {
-    @apply text-red-400 text-xs;
+    @apply text-xs;
+    color: var(--danger-400);
   }
   
   .text-error-center {
-    @apply text-red-400 text-sm text-center;
+    @apply text-sm text-center;
+    color: var(--danger-400);
   }
   
   .text-muted {
-    @apply text-gray-500 text-sm text-center;
+    @apply text-sm text-center;
+    color: var(--text-muted);
   }
   
   .text-muted-xs {
-    @apply text-gray-500 text-xs;
+    @apply text-xs;
+    color: var(--text-muted);
   }
   
   .wallet-address {
-    @apply text-gray-400 font-mono text-sm;
+    @apply font-mono text-sm;
+    color: var(--text-secondary);
   }
   
   .wallet-address-xs {
-    @apply text-gray-500 font-mono text-xs;
+    @apply font-mono text-xs;
+    color: var(--text-muted);
+  }
+
+  /* ==================== MODAL TEXT ==================== */
+  
+  .modal-title {
+    @apply text-xl font-bold mb-4;
+    color: var(--text-primary);
+  }
+  
+  .modal-label {
+    @apply block text-sm mb-1;
+    color: var(--text-muted);
+  }
+  
+  .modal-text {
+    @apply font-medium;
+    color: var(--text-primary);
+  }
+  
+  .modal-subtext {
+    @apply text-xs font-mono;
+    color: var(--text-muted);
+  }
+
+  /* ==================== COPY BUTTON ==================== */
+  
+  .copy-btn {
+    color: var(--text-muted);
+  }
+  .copy-btn:hover {
+    background-color: var(--neutral-300);
+  }
+  
+  .copy-toast {
+    @apply absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs px-2 py-1 rounded;
+    background-color: var(--neutral-300);
+    color: var(--text-primary);
+    animation: fadeInOut 2s ease-in-out;
+  }
+  
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translateX(-50%) translateY(4px); }
+    15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+  }
+
+  /* ==================== HISTORY ==================== */
+  
+  .history-toggle-btn {
+    background-color: var(--neutral-300);
+    color: var(--text-secondary);
+  }
+  .history-toggle-btn:hover {
+    background-color: var(--neutral-400);
+  }
+  
+  .history-filter-select {
+    background-color: var(--neutral-200);
+    color: var(--text-primary);
+    border: 1px solid var(--neutral-400);
+  }
+  .history-filter-select:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
   }
 
   /* ==================== LAYOUT ==================== */
   
   .main-container {
-    @apply min-h-screen bg-gradient-to-b from-gray-900 to-black flex flex-col;
+    @apply min-h-screen flex flex-col;
+    background: linear-gradient(to bottom, var(--background), var(--background-secondary));
   }
   
   .content-area {
@@ -141,20 +379,54 @@
   /* ==================== NAV ==================== */
   
   .desktop-header {
-    @apply hidden md:block bg-gray-800/80 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-50;
+    @apply hidden md:block backdrop-blur-sm sticky top-0 z-50;
+    background-color: color-mix(in srgb, var(--card) 80%, transparent);
+    border-bottom: 1px solid var(--border);
   }
   
   .mobile-nav {
-    @apply md:hidden fixed bottom-0 left-0 right-0 bg-gray-800/95 backdrop-blur-sm border-t border-gray-700 z-50;
+    @apply md:hidden fixed bottom-0 left-0 right-0 backdrop-blur-sm z-50;
+    background-color: color-mix(in srgb, var(--card) 95%, transparent);
+    border-top: 1px solid var(--border);
   }
 
   /* ==================== DROPDOWN ==================== */
   
   .dropdown {
-    @apply absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto;
+    @apply absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto;
+    background-color: var(--card);
+    border: 1px solid var(--border);
   }
   
   .dropdown-item {
-    @apply w-full px-3 py-2 text-left hover:bg-gray-700 text-white text-sm;
+    @apply w-full px-3 py-2 text-left text-sm transition-colors;
+    color: var(--text-primary);
+  }
+  .dropdown-item:hover {
+    background-color: var(--card-hover);
+  }
+
+  /* ==================== MODAL ==================== */
+  
+  .modal-overlay {
+    @apply fixed inset-0 flex items-center justify-center z-50 p-4;
+    background-color: var(--overlay);
+  }
+  
+  .modal-content {
+    @apply rounded-xl p-6 w-full max-w-md;
+    background-color: var(--card);
+    border: 1px solid var(--border);
+  }
+
+  /* ==================== THEME TOGGLE ==================== */
+  
+  .theme-toggle {
+    @apply p-2 rounded-lg transition-all duration-200;
+    background-color: var(--neutral-200);
+    color: var(--text-secondary);
+  }
+  .theme-toggle:hover {
+    background-color: var(--neutral-300);
   }
 }
