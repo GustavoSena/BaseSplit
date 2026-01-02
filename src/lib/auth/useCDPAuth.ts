@@ -32,9 +32,18 @@ export function useCDPAuth() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Handle session expiration or sign out
+      if (event === "SIGNED_OUT" || event === "TOKEN_REFRESHED" && !session) {
+        clearAllCache();
+        setStatus("signed_out");
+        setWalletAddress(null);
+        setSmartAccountAddress(null);
+        setEoaAddress(null);
+      }
     });
 
     return () => subscription.unsubscribe();

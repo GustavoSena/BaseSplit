@@ -541,7 +541,7 @@ export function RequestsTab({
               {pr.memo && <p className="text-muted-foreground text-xs">{pr.memo}</p>}
               <button
                 onClick={() => cancelRequest(pr.id, "cancel")}
-                className="mt-2 btn-ghost"
+                className="mt-2 btn-danger"
               >
                 Cancel Request
               </button>
@@ -618,53 +618,79 @@ export function RequestsTab({
             return (
               <>
                 {displayedHistory.map((pr) => {
-              const amountUSDC = (Number(pr.amount) / 1e6).toFixed(2);
-              const balanceChange = pr.direction === "sent" ? `+$${amountUSDC}` : `-$${amountUSDC}`;
-              const balanceColor = pr.direction === "sent" ? "text-success-500" : "text-danger-500";
+                  const amountUSDC = (Number(pr.amount) / 1e6).toFixed(2);
+                  const balanceChange = pr.direction === "sent" ? `+$${amountUSDC}` : `-$${amountUSDC}`;
+                  const balanceColor = pr.direction === "sent" ? "text-success-500" : "text-danger-500";
+                  const otherAddress = pr.direction === "sent" ? pr.payer_wallet_address : pr.profiles?.wallet_address;
+                  const contactLabel = getContactLabel(otherAddress);
+                  const displayName = contactLabel || (otherAddress ? `${otherAddress.slice(0, 6)}...${otherAddress.slice(-4)}` : "Unknown");
 
-              return (
-                <div key={pr.id} className="list-item">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs ${pr.direction === "sent" ? "text-primary-500" : "text-primary-400"}`}>
-                        {pr.direction === "sent" ? "↑ Sent Request" : "↓ Received Request"}
-                      </span>
-                      <span className="font-medium">{amountUSDC} USDC</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {pr.status === "paid" && (
-                        <span className={`text-xs font-medium ${balanceColor}`}>
-                          {balanceChange}
-                        </span>
+                  return (
+                    <div key={pr.id} className="list-item">
+                      {/* Main row with grid layout */}
+                      <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+                        {/* Column 1: Direction + Address/Contact */}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs whitespace-nowrap ${pr.direction === "sent" ? "text-primary-500" : "text-primary-400"}`}>
+                              {pr.direction === "sent" ? "↑ Sent" : "↓ Received"}
+                            </span>
+                            <div className="truncate">
+                              <span className="text-sm">
+                                {pr.direction === "sent" ? "To: " : "From: "}
+                                <span className={contactLabel ? "font-medium" : "font-mono text-muted-foreground"}>
+                                  {displayName}
+                                </span>
+                              </span>
+                              {contactLabel && otherAddress && (
+                                <span className="text-xs text-muted-foreground ml-1 font-mono">
+                                  ({otherAddress.slice(0, 6)}...{otherAddress.slice(-4)})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Column 2: Amount */}
+                        <div className="text-right whitespace-nowrap">
+                          <span className="font-medium">{amountUSDC} USDC</span>
+                          {pr.status === "paid" && (
+                            <span className={`text-xs font-medium ml-2 ${balanceColor}`}>
+                              {balanceChange}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Column 3: Status */}
+                        <div className="w-20 text-right">
+                          <span className={
+                            pr.status === "paid" ? "badge-paid" :
+                            pr.status === "rejected" ? "badge-rejected" :
+                            pr.status === "cancelled" ? "badge-cancelled" :
+                            "badge-pending"
+                          }>{pr.status}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Secondary info row */}
+                      {(pr.memo || pr.tx_hash) && (
+                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                          {pr.memo && <span>{pr.memo}</span>}
+                          {pr.tx_hash && (
+                            <a 
+                              href={`https://basescan.org/tx/${pr.tx_hash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary-500 hover:underline"
+                            >
+                              View transaction
+                            </a>
+                          )}
+                        </div>
                       )}
-                      <span className={
-                        pr.status === "paid" ? "badge-paid" :
-                        pr.status === "rejected" ? "badge-rejected" :
-                        pr.status === "cancelled" ? "badge-cancelled" :
-                        "badge-pending"
-                      }>{pr.status}</span>
                     </div>
-                  </div>
-                  <p className="text-muted-foreground text-xs mt-1">
-                    {pr.direction === "sent" 
-                      ? `To: ${getContactLabel(pr.payer_wallet_address) || (pr.payer_wallet_address ? `${pr.payer_wallet_address.slice(0, 6)}...${pr.payer_wallet_address.slice(-4)}` : "Unknown")}`
-                      : `From: ${getContactLabel(pr.profiles?.wallet_address) || (pr.profiles?.wallet_address ? `${pr.profiles.wallet_address.slice(0, 6)}...${pr.profiles.wallet_address.slice(-4)}` : "Unknown")}`
-                    }
-                  </p>
-                  {pr.memo && <p className="text-muted-foreground text-xs">{pr.memo}</p>}
-                  {pr.tx_hash && (
-                    <a 
-                      href={`https://basescan.org/tx/${pr.tx_hash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary-500 text-xs hover:underline"
-                    >
-                      View transaction
-                    </a>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
                 {hasMore && (
                   <button
                     onClick={() => setHistoryDisplayCount(prev => prev + 20)}

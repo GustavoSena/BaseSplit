@@ -182,6 +182,13 @@ export default function Home() {
     }
   }, [currentWalletAddress, refetchBalance]);
 
+  // Load contacts eagerly when wallet address is available
+  useEffect(() => {
+    if (currentWalletAddress) {
+      loadContacts();
+    }
+  }, [currentWalletAddress, loadContacts]);
+
   // Update payment request status when transaction is confirmed
   useEffect(() => {
     const requestId = payingRequestIdRef.current || payingRequestId;
