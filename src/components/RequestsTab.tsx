@@ -628,40 +628,20 @@ export function RequestsTab({
                   return (
                     <div key={pr.id} className="list-item">
                       {/* Main row with grid layout */}
-                      <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
-                        {/* Column 1: Direction + Address/Contact */}
+                      <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 items-start">
+                        {/* Row 1, Column 1: Direction */}
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs whitespace-nowrap ${pr.direction === "sent" ? "text-primary-500" : "text-primary-400"}`}>
-                              {pr.direction === "sent" ? "↑ Sent" : "↓ Received"}
-                            </span>
-                            <div className="truncate">
-                              <span className="text-sm">
-                                {pr.direction === "sent" ? "To: " : "From: "}
-                                <span className={contactLabel ? "font-medium" : "font-mono text-muted-foreground"}>
-                                  {displayName}
-                                </span>
-                              </span>
-                              {contactLabel && otherAddress && (
-                                <span className="text-xs text-muted-foreground ml-1 font-mono">
-                                  ({otherAddress.slice(0, 6)}...{otherAddress.slice(-4)})
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                          <span className={`text-xs whitespace-nowrap ${pr.direction === "sent" ? "text-primary-500" : "text-primary-400"}`}>
+                            {pr.direction === "sent" ? "↑ Sent Request" : "↓ Received Request"}
+                          </span>
                         </div>
                         
-                        {/* Column 2: Amount */}
+                        {/* Row 1, Column 2: Amount */}
                         <div className="text-right whitespace-nowrap">
                           <span className="font-medium">{amountUSDC} USDC</span>
-                          {pr.status === "paid" && (
-                            <span className={`text-xs font-medium ml-2 ${balanceColor}`}>
-                              {balanceChange}
-                            </span>
-                          )}
                         </div>
                         
-                        {/* Column 3: Status */}
+                        {/* Row 1, Column 3: Status */}
                         <div className="w-20 text-right">
                           <span className={
                             pr.status === "paid" ? "badge-paid" :
@@ -670,9 +650,36 @@ export function RequestsTab({
                             "badge-pending"
                           }>{pr.status}</span>
                         </div>
+                        
+                        {/* Row 2, Column 1: Address/Contact */}
+                        <div className="min-w-0 truncate text-sm">
+                          <span className="text-muted-foreground">
+                            {pr.direction === "sent" ? "To: " : "From: "}
+                          </span>
+                          <span className={contactLabel ? "font-medium" : "font-mono text-muted-foreground"}>
+                            {displayName}
+                          </span>
+                          {contactLabel && otherAddress && (
+                            <span className="text-xs text-muted-foreground ml-1 font-mono">
+                              ({otherAddress.slice(0, 6)}...{otherAddress.slice(-4)})
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Row 2, Column 2: Empty or memo placeholder */}
+                        <div></div>
+                        
+                        {/* Row 2, Column 3: Balance change (under status) */}
+                        <div className="w-20 text-right">
+                          {pr.status === "paid" && (
+                            <span className={`text-xs font-medium ${balanceColor}`}>
+                              {balanceChange}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       
-                      {/* Secondary info row */}
+                      {/* Memo and transaction link row */}
                       {(pr.memo || pr.tx_hash) && (
                         <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                           {pr.memo && <span>{pr.memo}</span>}
