@@ -4,49 +4,50 @@ import { useState } from "react";
 import { Contact } from "@/lib/supabase/queries";
 import { validateUSDCAmount } from "@/lib/validation";
 
-interface SendMoneyModalProps {
+interface RequestMoneyModalProps {
   contact: Contact;
   onClose: () => void;
-  onSend: (address: string, amount: number) => void;
-  isSending: boolean;
-  isConfirming: boolean;
+  onRequest: (address: string, amount: number, memo?: string) => Promise<{ success: boolean; error?: string }>;
+  isSubmitting: boolean;
 }
 
 /**
- * Modal UI for sending USDC to a contact.
+ * Modal UI for requesting USDC from a contact.
  *
- * Validates the entered amount (must be at least $0.01 and at most $10,000) and invokes `onSend` with
- * the contact's wallet address and the parsed numeric amount when submission is valid.
+ * Validates the entered amount (must be at least $0.01 and at most $10,000) and invokes `onRequest` with
+ * the contact's wallet address, the parsed numeric amount, and optional memo when submission is valid.
  */
-export function SendMoneyModal({
+export function RequestMoneyModal({
   contact,
   onClose,
-  onSend,
-  isSending,
-  isConfirming,
-}: SendMoneyModalProps) {
+  onRequest,
+  isSubmitting,
+}: RequestMoneyModalProps) {
   const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const validation = validateUSDCAmount(amount);
     if (!validation.isValid) {
       setError(validation.error);
       return;
     }
+    
     setError(null);
-    onSend(contact.contact_wallet_address, validation.amount);
+    const result = await onRequest(contact.contact_wallet_address, validation.amount, memo || undefined);
+    if (!result.success && result.error) {
+      setError(result.error);
+    }
   };
-
-  const isProcessing = isSending || isConfirming;
 
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <h2 className="modal-title">Send Money</h2>
+        <h2 className="modal-title">Request Money</h2>
         
         <div className="mb-4">
-          <p className="modal-label">Sending to</p>
+          <p className="modal-label">Requesting from</p>
           <p className="modal-text">{contact.label}</p>
           <p className="modal-subtext">
             {contact.contact_wallet_address.slice(0, 10)}...{contact.contact_wallet_address.slice(-8)}
@@ -63,7 +64,19 @@ export function SendMoneyModal({
             className="input"
             min="0.01"
             step="0.01"
-            disabled={isProcessing}
+            disabled={isSubmitting}
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="modal-label">Memo (optional)</label>
+          <input
+            type="text"
+            placeholder="What's this for?"
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            className="input"
+            disabled={isSubmitting}
           />
         </div>
 
@@ -73,7 +86,7 @@ export function SendMoneyModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={isProcessing}
+            disabled={isSubmitting}
             className="flex-1 btn-secondary"
           >
             Cancel
@@ -81,10 +94,10 @@ export function SendMoneyModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isProcessing || !amount}
-            className="flex-1 btn-primary"
+            disabled={isSubmitting || !amount}
+            className="flex-1 btn-success"
           >
-            {isSending ? "Sending..." : isConfirming ? "Confirming..." : "Send"}
+            {isSubmitting ? "Creating..." : "Request"}
           </button>
         </div>
       </div>

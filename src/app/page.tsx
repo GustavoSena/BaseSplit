@@ -16,6 +16,7 @@ import { ContactsTab, useContacts } from "@/components/ContactsTab";
 import { SettingsTab } from "@/components/SettingsTab";
 import { RequestsTab } from "@/components/RequestsTab";
 import { SendMoneyModal } from "@/components/SendMoneyModal";
+import { RequestMoneyModal } from "@/components/RequestMoneyModal";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import {
   Contact,
@@ -24,6 +25,7 @@ import {
   createDirectTransfer,
   getProfileIdByWallet,
   createContact,
+  createPaymentRequest as createPaymentRequestQuery,
 } from "@/lib/supabase/queries";
 
 const ERC20_ABI = [
@@ -62,7 +64,11 @@ export default function Home() {
   const walletAuth = useSupabaseWeb3Auth();
   const cdpAuth = useCDPAuth();
   
-  const currentWalletAddress = address || cdpAuth.walletAddress;
+  // For CDP users, always use smart account. For external wallet users, use their address.
+  // Prioritize smart account over wagmi address to prevent showing EOA first
+  const currentWalletAddress = isCDPSignedIn 
+    ? cdpAuth.smartAccountAddress 
+    : (address || cdpAuth.walletAddress);
   
   // USDC Balances using custom hook
   const { formattedBalance, refetch: refetchBalance } = useUSDCBalance(currentWalletAddress);
@@ -79,7 +85,16 @@ export default function Home() {
   
   // Send money modal state
   const [sendMoneyContact, setSendMoneyContact] = useState<Contact | null>(null);
+  
+  // Request money modal state
+  const [requestModalContact, setRequestModalContact] = useState<Contact | null>(null);
+  const [isCreatingRequest, setIsCreatingRequest] = useState(false);
+  
+  // Legacy - for prefilling RequestsTab (keeping for backwards compatibility)
   const [requestMoneyContact, setRequestMoneyContact] = useState<Contact | null>(null);
+  
+  // Copy address confirmation
+  const [showCopied, setShowCopied] = useState(false);
   
   // Pending transfer state for recording to history
   const [pendingTransfer, setPendingTransfer] = useState<{
@@ -166,6 +181,13 @@ export default function Home() {
       refetchBalance();
     }
   }, [currentWalletAddress, refetchBalance]);
+
+  // Load contacts eagerly when wallet address is available
+  useEffect(() => {
+    if (currentWalletAddress) {
+      loadContacts();
+    }
+  }, [currentWalletAddress, loadContacts]);
 
   // Update payment request status when transaction is confirmed
   useEffect(() => {
@@ -262,157 +284,200 @@ export default function Home() {
     });
   }, [address, writeContracts, capabilities]);
 
-  // Record transfer to history and handle save as contact when transaction is confirmed
-  useEffect(() => {
-    const recordTransfer = async () => {
-      const transfer = pendingTransferRef.current || pendingTransfer;
-      if (!isConfirmed || !txHash || !transfer || !currentWalletAddress) return;
-      
-      // Guard against duplicate recording in React Strict Mode
-      if (isRecordingTransferRef.current) return;
-      isRecordingTransferRef.current = true;
-      
-      try {
-        const profileResult = await getProfileIdByWallet(currentWalletAddress);
-        if (profileResult.data) {
-          // Record transfer to history
-          await createDirectTransfer({
-            senderId: profileResult.data.id,
-            recipientWalletAddress: transfer.toAddress,
-            amount: transfer.amount,
-            memo: transfer.memo,
-            txHash,
-          });
-          
-          // Save as contact if requested
-          if (transfer.saveAsContact && transfer.contactLabel) {
-            await createContact({
-              ownerId: profileResult.data.id,
-              contactWalletAddress: transfer.toAddress,
-              label: transfer.contactLabel,
-            });
-            loadContacts();
-          }
-        }
-      } catch (err) {
-        console.error("Failed to record transfer:", err);
-      }
-      
-      setPendingTransfer(null);
-      pendingTransferRef.current = null;
-      isRecordingTransferRef.current = false;
-      refetchBalance();
-    };
+// Record transfer to history and handle save as contact when transaction is confirmed
+useEffect(() => {
+  const recordTransfer = async () => {
+    const transfer = pendingTransferRef.current || pendingTransfer;
+    if (!isConfirmed || !txHash || !transfer || !currentWalletAddress) return;
     
-    recordTransfer();
-  }, [isConfirmed, txHash, pendingTransfer, currentWalletAddress, loadContacts, refetchBalance]);
-
-  // Close send money modal when transaction is confirmed
-  useEffect(() => {
-    if (isConfirmed && sendMoneyContact) {
-      setSendMoneyContact(null);
+    // Guard against duplicate recording in React Strict Mode
+    if (isRecordingTransferRef.current) return;
+    isRecordingTransferRef.current = true;
+    
+    try {
+      const profileResult = await getProfileIdByWallet(currentWalletAddress);
+      if (profileResult.data) {
+        // Record transfer to history
+        await createDirectTransfer({
+          senderId: profileResult.data.id,
+          recipientWalletAddress: transfer.toAddress,
+          amount: transfer.amount,
+          memo: transfer.memo,
+          txHash,
+        });
+        
+        // Save as contact if requested
+        if (transfer.saveAsContact && transfer.contactLabel) {
+          await createContact({
+            ownerId: profileResult.data.id,
+            contactWalletAddress: transfer.toAddress,
+            label: transfer.contactLabel,
+          });
+          loadContacts();
+        }
+      }
+    } catch (err) {
+      console.error("Failed to record transfer:", err);
     }
-  }, [isConfirmed, sendMoneyContact]);
+    
+    setPendingTransfer(null);
+    pendingTransferRef.current = null;
+    isRecordingTransferRef.current = false;
+    refetchBalance();
+  };
+  
+  recordTransfer();
+}, [isConfirmed, txHash, pendingTransfer, currentWalletAddress, loadContacts, refetchBalance]);
 
-  // Handle request money - switch to requests tab with pre-filled contact
-  const handleRequestMoney = useCallback((contact: Contact) => {
-    setRequestMoneyContact(contact);
-    setActiveTab("requests");
-  }, []);
-
-  // Memoized callback for clearing prefilled contact (prevents effect re-runs)
-  const clearPrefilledContact = useCallback(() => {
-    setRequestMoneyContact(null);
-  }, []);
-
-  if (!mounted) {
-    return <LoadingScreen />;
+// Close send money modal when transaction is confirmed
+useEffect(() => {
+  if (isConfirmed && sendMoneyContact) {
+    setSendMoneyContact(null);
   }
+}, [isConfirmed, sendMoneyContact]);
 
-  // Not authenticated - show login screen
-  if (!isAuthenticated) {
-    return <LoginScreen isConnected={isConnected} walletAuth={walletAuth} authError={authError} />;
+// Handle request money - show modal popup (like send money)
+const handleRequestMoney = useCallback((contact: Contact) => {
+  setRequestModalContact(contact);
+}, []);
+
+// Create payment request from modal
+const createRequestFromModal = useCallback(async (address: string, amount: number, memo?: string): Promise<{ success: boolean; error?: string }> => {
+  if (!currentWalletAddress) {
+    return { success: false, error: "Wallet not connected" };
   }
+  
+  setIsCreatingRequest(true);
+  try {
+    const profileResult = await getProfileIdByWallet(currentWalletAddress);
+    if (!profileResult.data) {
+      return { success: false, error: "Profile not found. Please sign in again." };
+    }
+    
+    const amountInMicroUnits = Math.floor(amount * 1e6);
+    const result = await createPaymentRequestQuery({
+      requesterId: profileResult.data.id,
+      payerWalletAddress: address,
+      amount: amountInMicroUnits,
+      memo: memo || null,
+    });
+    
+    if (result.error) {
+      return { success: false, error: result.error };
+    }
+    
+    setRequestModalContact(null);
+    return { success: true };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Failed to create request";
+    return { success: false, error: errorMessage };
+  } finally {
+    setIsCreatingRequest(false);
+  }
+}, [currentWalletAddress]);
 
-  // Authenticated - show app
-  return (
-    <main className="main-container">
-      <DesktopHeader activeTab={activeTab} onTabChange={handleTabChange} />
+// Memoized callback for clearing prefilled contact (prevents effect re-runs)
+const clearPrefilledContact = useCallback(() => {
+  setRequestMoneyContact(null);
+}, []);
 
-      {/* Main Content */}
-      <div className="content-area">
-        <div className="content-wrapper">
-          {/* Balance Card */}
-          <div className="balance-card">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <p className="wallet-address">
-                {currentWalletAddress?.slice(0, 6)}...{currentWalletAddress?.slice(-4)}
-              </p>
-              <button
-                onClick={() => {
-                  if (currentWalletAddress) navigator.clipboard.writeText(currentWalletAddress);
-                }}
-                className="p-1 hover:bg-gray-700 rounded transition-colors"
-                title="Copy address"
-              >
-                <ClipboardIcon className="text-gray-500" />
-              </button>
-            </div>
-            <p className="text-4xl font-bold text-white">${formattedBalance}</p>
-            <p className="text-gray-500 text-sm">USDC Balance</p>
+if (!mounted) {
+  return <LoadingScreen />;
+}
+
+// Not authenticated - show login screen
+if (!isAuthenticated) {
+  return <LoginScreen isConnected={isConnected} walletAuth={walletAuth} authError={authError} />;
+}
+
+// Authenticated - show app
+return (
+  <main className="main-container">
+    <DesktopHeader activeTab={activeTab} onTabChange={handleTabChange} />
+
+    <div className="content-area">
+      <div className="content-wrapper">
+        <div className="balance-card">
+          <div className="flex items-center justify-center gap-2 mb-2 relative">
+            <p className="wallet-address">
+              {currentWalletAddress?.slice(0, 6)}...{currentWalletAddress?.slice(-4)}
+            </p>
+            <button
+              onClick={() => {
+                if (currentWalletAddress) {
+                  navigator.clipboard.writeText(currentWalletAddress);
+                  setShowCopied(true);
+                  setTimeout(() => setShowCopied(false), 2000);
+                }
+              }}
+              className="p-1 rounded transition-colors copy-btn"
+              title="Copy address"
+            >
+              <ClipboardIcon />
+            </button>
+            {showCopied && (
+              <span className="copy-toast">Copied!</span>
+            )}
           </div>
-
-          {/* Tab Content */}
-          {/* Contacts Tab */}
-          {activeTab === "contacts" && (
-            <ContactsTab 
-              currentWalletAddress={currentWalletAddress}
-              onSendMoney={(contact) => setSendMoneyContact(contact)}
-              onRequestMoney={handleRequestMoney}
-            />
-          )}
-
-          {/* Settings Tab */}
-          {activeTab === "settings" && (
-            <SettingsTab
-              isCDPSignedIn={isCDPSignedIn}
-              cdpAuth={cdpAuth}
-              walletAuth={walletAuth}
-              formattedSmartBalance={formattedSmartBalance}
-              formattedEoaBalance={formattedEoaBalance}
-            />
-          )}
-
-          {/* Requests Tab */}
-          {activeTab === "requests" && (
-            <RequestsTab
-              currentWalletAddress={currentWalletAddress}
-              contacts={contacts}
-              loadContacts={loadContacts}
-              payPaymentRequest={payPaymentRequest}
-              payingRequestId={payingRequestId}
-              isSending={isSending}
-              isConfirming={isConfirming}
-              prefilledContact={requestMoneyContact}
-              onPrefilledContactUsed={clearPrefilledContact}
-              onSendMoney={(toAddress: string, amount: number, memo?: string) => sendMoneyFromRequests(toAddress, amount, memo)}
-            />
-          )}
+          <p className="text-4xl font-bold text-foreground">${formattedBalance}</p>
+          <p className="text-muted-foreground text-sm">USDC Balance</p>
         </div>
-      </div>  
 
-      <MobileNav activeTab={activeTab} onTabChange={handleTabChange} />
+        {activeTab === "contacts" && (
+          <ContactsTab 
+            currentWalletAddress={currentWalletAddress}
+            onSendMoney={(contact) => setSendMoneyContact(contact)}
+            onRequestMoney={handleRequestMoney}
+          />
+        )}
 
-      {/* Send Money Modal */}
-      {sendMoneyContact && (
-        <SendMoneyModal
-          contact={sendMoneyContact}
-          onClose={() => setSendMoneyContact(null)}
-          onSend={sendDirectMoney}
-          isSending={isSending}
-          isConfirming={isConfirming}
-        />
-      )}
-    </main>
-  );
+        {activeTab === "settings" && (
+          <SettingsTab
+            isCDPSignedIn={isCDPSignedIn}
+            cdpAuth={cdpAuth}
+            walletAuth={walletAuth}
+            formattedSmartBalance={formattedSmartBalance}
+            formattedEoaBalance={formattedEoaBalance}
+          />
+        )}
+
+        {activeTab === "requests" && (
+          <RequestsTab
+            currentWalletAddress={currentWalletAddress}
+            contacts={contacts}
+            loadContacts={loadContacts}
+            payPaymentRequest={payPaymentRequest}
+            payingRequestId={payingRequestId}
+            isSending={isSending}
+            isConfirming={isConfirming}
+            prefilledContact={requestMoneyContact}
+            onPrefilledContactUsed={clearPrefilledContact}
+            onSendMoney={(toAddress: string, amount: number, memo?: string) => sendMoneyFromRequests(toAddress, amount, memo)}
+          />
+        )}
+      </div>
+    </div>
+
+    <MobileNav activeTab={activeTab} onTabChange={handleTabChange} />
+
+    {sendMoneyContact && (
+      <SendMoneyModal
+        contact={sendMoneyContact}
+        onClose={() => setSendMoneyContact(null)}
+        onSend={sendDirectMoney}
+        isSending={isSending}
+        isConfirming={isConfirming}
+      />
+    )}
+
+    {requestModalContact && (
+      <RequestMoneyModal
+        contact={requestModalContact}
+        onClose={() => setRequestModalContact(null)}
+        onRequest={createRequestFromModal}
+        isSubmitting={isCreatingRequest}
+      />
+    )}
+  </main>
+);
 }
