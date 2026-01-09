@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useIsSignedIn, useSignOut, useCurrentUser } from "@coinbase/cdp-hooks";
 import { supabase } from "@/lib/supabase/client";
 import { clearAllCache } from "@/lib/cache";
@@ -20,6 +20,9 @@ export function useCDPAuth() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [smartAccountAddress, setSmartAccountAddress] = useState<string | null>(null);
   const [eoaAddress, setEoaAddress] = useState<string | null>(null);
+  
+  // Track if CDP SDK has been initialized (was ever signed in)
+  const cdpWasSignedInRef = useRef(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -95,11 +98,17 @@ export function useCDPAuth() {
   }, [currentUser]);
 
   // Auto sign out from Supabase when CDP wallet session expires
+  // Only triggers after CDP was previously signed in (not on initial mount)
   useEffect(() => {
     const checkAndSignOut = async () => {
-      // If CDP is not signed in but we have a Supabase session, sign out of Supabase
-      if (isCDPSignedIn === false && session) {
-        console.log("CDP session expired, signing out of Supabase");
+      // Track when CDP becomes signed in
+      if (isCDPSignedIn === true) {
+        cdpWasSignedInRef.current = true;
+        return;
+      }
+      
+      // Only sign out if CDP was previously signed in and now is false
+      if (cdpWasSignedInRef.current && isCDPSignedIn === false && session) {
         await supabase.auth.signOut();
         clearAllCache();
         setStatus("signed_out");
@@ -108,6 +117,7 @@ export function useCDPAuth() {
         setWalletAddress(null);
         setSmartAccountAddress(null);
         setEoaAddress(null);
+        cdpWasSignedInRef.current = false;
       }
     };
     
