@@ -75,7 +75,8 @@ export default function Home() {
   const { formattedBalance: formattedSmartBalance } = useUSDCBalance(cdpAuth.smartAccountAddress);
   const { formattedBalance: formattedEoaBalance } = useUSDCBalance(cdpAuth.eoaAddress);
   
-  const isAuthenticated = walletAuth.isAuthenticated || cdpAuth.isAuthenticated;
+  // Require both authentication AND a valid wallet address
+  const isAuthenticated = (walletAuth.isAuthenticated || cdpAuth.isAuthenticated) && !!currentWalletAddress;
   const authError = walletAuth.error || cdpAuth.error;
   
   const { contacts, loadContacts } = useContacts(currentWalletAddress);
