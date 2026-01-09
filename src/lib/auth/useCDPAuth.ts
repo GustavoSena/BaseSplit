@@ -94,6 +94,26 @@ export function useCDPAuth() {
     }
   }, [currentUser]);
 
+  // Auto sign out from Supabase when CDP wallet session expires
+  useEffect(() => {
+    const checkAndSignOut = async () => {
+      // If CDP is not signed in but we have a Supabase session, sign out of Supabase
+      if (isCDPSignedIn === false && session) {
+        console.log("CDP session expired, signing out of Supabase");
+        await supabase.auth.signOut();
+        clearAllCache();
+        setStatus("signed_out");
+        setSession(null);
+        setUser(null);
+        setWalletAddress(null);
+        setSmartAccountAddress(null);
+        setEoaAddress(null);
+      }
+    };
+    
+    checkAndSignOut();
+  }, [isCDPSignedIn, session]);
+
   useEffect(() => {
     const syncWithSupabase = async () => {
       if (isCDPSignedIn && currentUser) {
